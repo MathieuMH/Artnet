@@ -48,6 +48,15 @@ THE SOFTWARE.
 #define ART_POLL_REPLY 0x2100
 #define ART_DMX 0x5000
 #define ART_SYNC 0x5200
+#define ART_ADDRESS 0x6000
+#define ART_TIME_CODE 0x5200
+#define ART_TIME_SYNC 0x5200
+#define ART_TRIGGER 0x9900
+#define RDM_REQUEST 0x8000
+#define RDM_DATA 0x8100
+#define RDM_CONTROL 0x8200
+#define RDM 0x8300
+#define RDM_SUB 0x8400
 // Buffers
 #define MAX_BUFFER_ARTNET 530
 // Packet
