@@ -1,6 +1,6 @@
 {
   "name": "Art-Net",
-  "keywords": "artnet, art-net, Ethernet, DMX",
+  "keywords": "artnet, art-net, Ethernet, DMX, UDP, lighting, RDM",
   "description": "An Art-Net library for Teensy and Arduino",
   "repository":
   {
@@ -11,7 +11,12 @@
   [
     {
       "name": "Nathanaël Lécaudé",
+      "url": "https://github.com/natcl",
       "maintainer": true
+    },
+    {
+      "name": "Mathieu Hebbrecht",
+      "url": "https://github.com/MathieuMH"
     }
   ],
   "dependencies":
@@ -22,5 +27,6 @@
   },
   "version": "1.0.0",
   "frameworks": "arduino",
-  "platforms": "*"
+  "platforms": "*",
+  "license": "MIT"
 }
