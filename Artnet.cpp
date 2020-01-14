@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+/* Credit: Art-Net™ Designed by and Copyright Artistic Licence Holdings Ltd */
+
 #include <Artnet.h>
 
 Artnet::Artnet() {}
@@ -31,12 +33,23 @@ void Artnet::begin(byte mac[], byte ip[])
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     Ethernet.begin(mac,ip);
   #endif
+  DcHp = false;
+  Udp.begin(ART_NET_PORT);
+}
+
+void Artnet::begin(byte mac[], byte ip[])
+{
+  #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
+    Ethernet.begin(mac);
+    DcHp = true;
+  #endif
 
   Udp.begin(ART_NET_PORT);
 }
 
 void Artnet::begin()
 {
+  DcHp = false;
   Udp.begin(ART_NET_PORT);
 }
 
@@ -50,13 +63,12 @@ void Artnet::setBroadcast(IPAddress bc)
   //sets the broadcast address
   broadcast = bc;
 }
+
 // **** Function Artnet::read() ****
 // Descr: This function parses the received package, checks wether it is valid
 // Return:
-//    ART_DMX in case of valid received DMX data
-//    ART_POLL in case a poll req was received.
-//    ART_SYNC in case a Artnet SYNC req was received
-//    0 in case the opcode was unsupported or the packet ID wasn't "Art-Net"
+//    In case a supported opcode was received the opcode is returned.
+//    In all other cases 0.
 uint16_t Artnet::read()
 {
   packetSize = Udp.parsePacket();
@@ -77,42 +89,60 @@ uint16_t Artnet::read()
 
       switch(opcode) 
       {
-        case ART_DMX:
+        // -- OpDmc or OpOutput was received, now we need to extract the DMX date from the frame.
+        case OpDmx:
           sequence = artnetPacket[12];
           incomingUniverse = artnetPacket[14] | artnetPacket[15] << 8;
           dmxDataLength = artnetPacket[17] | artnetPacket[16] << 8;
 
+          // When an artDmxCallback is specified we call this function.
           if (artDmxCallback) (*artDmxCallback)(incomingUniverse, dmxDataLength, sequence, artnetPacket + ART_DMX_START, remoteIP);
-            return ART_DMX;
-        
-        case ART_POLL:
-          //fill the reply struct, and then send it to the network's broadcast address
-          Serial.print("POLL from ");
-          Serial.print(remoteIP);
-          Serial.print(" broadcast addr: ");
-          Serial.println(broadcast);
+          
+          // Return that we received ad OpDmx OpOutput packet.
+          return OpDmx;
 
+
+        // -- OpPoll received, now we have to respond with an OpPollReply message within 3 seconds.
+        // fill the reply struct, and then send it to the network's broadcast address
+        case OpPoll:
+            if(DEBUG) {
+              Serial.print("POLL from ");
+              Serial.print(remoteIP);
+              Serial.print(" broadcast addr: ");
+              Serial.println(broadcast);
+            }
+
+          // FIELD 1:: Array of 8 characters, the final character is a null termination. (Always 'A' 'r' 't' '-' 'N' 'e' 't' 0x00)
+          sprintf((char *)id, "Art-Net");
+          memcpy(ArtPollReply.id, id, sizeof(ArtPollReply.id));
+
+          // FIELD 2:: OpCode = OpPollReply since this is the poll reply
+          ArtPollReply.opCode = OpPollReply;
+
+          // FIELD 3:: Get the node's local IP address. And put it in the message.
           #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
             IPAddress local_ip = Ethernet.localIP();
           #else
             IPAddress local_ip = WiFi.localIP();
           #endif
+
           node_ip_address[0] = local_ip[0];
           node_ip_address[1] = local_ip[1];
           node_ip_address[2] = local_ip[2];
           node_ip_address[3] = local_ip[3];
-
-          sprintf((char *)id, "Art-Net");
-          memcpy(ArtPollReply.id, id, sizeof(ArtPollReply.id));
           memcpy(ArtPollReply.ip, node_ip_address, sizeof(ArtPollReply.ip));
 
-          ArtPollReply.opCode = ART_POLL_REPLY;
+          // FIELD 4:: Port - The Port is always 0x1936
           ArtPollReply.port =  ART_NET_PORT;
 
+          // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
+          
+          // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
           memset(ArtPollReply.goodinput,  0x08, 4);
           memset(ArtPollReply.goodoutput,  0x80, 4);
           memset(ArtPollReply.porttypes,  0xc0, 4);
 
+          // FIELD 15,16:: Short and long name.
           uint8_t shortname [18];
           uint8_t longname [64];
           sprintf((char *)shortname, "artnet arduino");
@@ -151,21 +181,28 @@ uint16_t Artnet::read()
               ArtPollReply.swout[i] = swout[i];
               ArtPollReply.swin[i] = swin[i];
           }
+
+          // FIELD 17:: NodeReport 
+          // Currently not compliant the Art-Net 4 specification (refer to page 21/22)
           sprintf((char *)ArtPollReply.nodereport, "%i DMX output universes active.", ArtPollReply.numbports);
-          Udp.beginPacket(broadcast, ART_NET_PORT);//send the packet to the broadcast address
+          
+          // UDP SEND :: All fields are filled in, now we can send the package to the controller using the boardcast IP.
+          Udp.beginPacket(broadcast, ART_NET_PORT);
           Udp.write((uint8_t *)&ArtPollReply, sizeof(ArtPollReply));
           Udp.endPacket();
 
-          return ART_POLL;
+          return OpPoll;
 
-        case ART_SYNC:
+        case OpSync:
           if (artSyncCallback) (*artSyncCallback)(remoteIP);
-            return ART_SYNC;
-          break;
+        
+          return OpSync;
         
         default:
-          Serial.print("An unsupported Art-Net opcode was recieved: 0x");
-          Serial.println(opcode, HEX);
+          if(DEBUG) {
+            Serial.print("An unsupported Art-Net opcode was recieved: 0x");
+            Serial.println(opcode, HEX);
+          }  
           return 0;
       }
   }
@@ -197,4 +234,54 @@ void Artnet::printPacketContent()
     Serial.print("  ");
   }
   Serial.println('\n');
+}
+
+void Artnet::setDefaults()
+{ 
+    ArtPollReply.etsaman[0] = 0;                  //ESTA manufacturer code Lo
+    ArtPollReply.etsaman[1] = 0;                  //ESTA manufacturer code Hi
+    ArtPollReply.verH       = VersionInfoH;       //Use verH for library version
+    ArtPollReply.verL       = 0;                  // User can set this value, default it is 0.
+    ArtPollReply.subH       = 0;                  
+    ArtPollReply.sub        = 0;                  
+    ArtPollReply.oemH       = 0;                  // This device has no OEM code                          
+    ArtPollReply.oemL       = 0xFF;               // This device has no OEM code 
+    ArtPollReply.ubea       = 0;                  // We don't use User Bios Extension Area therefor set to 0               
+    ArtPollReply.swvideo    = 0;                  // Set to 00 when video display is showing local data.               
+    ArtPollReply.swmacro    = 0;                  // Set to 0 no marcro are used
+    ArtPollReply.swremote   = 0;                  // Set to 0 no remote triggers are used
+    ArtPollReply.style      = StNode;             // Set style to Standard node
+    ArtPollReply.numbportsH = 0;
+    ArtPollReply.numbports  = 4;
+
+    // FIELD 15,16:: Short and long name.
+    uint8_t shortname [18];
+    uint8_t longname [64];
+    sprintf((char *)shortname, "artnet arduino");
+    sprintf((char *)longname, "Art-Net -> Arduino Bridge");
+    memcpy(ArtPollReply.shortname, shortname, sizeof(shortname));
+    memcpy(ArtPollReply.longname, longname, sizeof(longname));
+
+    //Satus1 field #12 of the OpPollReply packet
+    // bit0 =1 UBEA present. ;; =0 UBEA not present or corrupt
+    // bit1 =1 Capable of Remote Device Management (RDM). ;; =0 Not capable of Remote Device Management (RDM).
+    // bit2 =1 Booted from ROM. ;; =0 Normal firmware boot (from flash).
+    // bit3 =0 Not implemented, transmit as zero, receivers do not test.
+    // bit5:4 =00 Port-Address Programming Authority unknown.. ;; =01 All Port-Address set by front panel controls. ;; =10 All or part of Port-Address programmed by network or Web browser. ;; =11 Not used.
+    // bit7:8 =00 Indicator state unknown. ;; =01 Indicators in Locate / Identify Mode. ;; = 10 Indicators in Mute Mode. ;; =11 Indicators in Normal Mode.
+    ArtPollReply.status1     = 0xd2;
+
+    //Satus 2 field #40 of the OpPollReply packet
+    // bit0 =1 Product supports web browser configuration.
+    // bit1 =1 Node’s IP is DHCP configured. ;; =0 Node’s IP is manually configured.
+    // bit2 =1 Node is DHCP capable. ;; =0 Node is not DHCP capable.
+    // bit3 =1 Node supports 15 bit Port-Address (Art-Net 3 or 4) ;; =0 Node supports 8 bit Port-Address (Art-Net II).
+    // bit4 =1 Node is able to switch between Art-Net and sACN. ;; =0 Node not able to switch between Art-Net and sACN.
+    // bit5 =1 squawking. ;; =0 Not squawking.
+    ArtPollReply.status2    = 0x08;
+}
+
+void sendArtPollReply() 
+{
+
 }
