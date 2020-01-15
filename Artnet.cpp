@@ -33,35 +33,41 @@ void Artnet::begin(byte mac[], byte ip[])
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     Ethernet.begin(mac,ip);
   #endif
-  DcHp = false;
+  DCHP = false;
+  //load the specified mac address into the ArtPollReply.mac[] array.
+  memcpy(ArtPollReply.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
 }
 
-void Artnet::begin(byte mac[], byte ip[])
+void Artnet::begin(byte mac[])
 {
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     Ethernet.begin(mac);
-    DcHp = true;
   #endif
+
+  DCHP = true;
+  //load the specified mac address into the ArtPollReply.mac[] array.
+  memcpy(ArtPollReply.mac, mac, 6);
 
   Udp.begin(ART_NET_PORT);
 }
 
+// NO MAC ADDRESS SET, REQUIRED!! no to update!
 void Artnet::begin()
 {
-  DcHp = false;
+  DCHP = false;
   Udp.begin(ART_NET_PORT);
 }
 
 void Artnet::setBroadcast(byte bc[])
 {
   //sets the broadcast address
-  broadcast = bc;
+  broadcastIP = bc;
 }
 void Artnet::setBroadcast(IPAddress bc)
 {
   //sets the broadcast address
-  broadcast = bc;
+  broadcastIP = bc;
 }
 
 // **** Function Artnet::read() ****
@@ -72,9 +78,9 @@ void Artnet::setBroadcast(IPAddress bc)
 uint16_t Artnet::read()
 {
   packetSize = Udp.parsePacket();
+  controllerIP = Udp.remoteIP();
 
-  remoteIP = Udp.remoteIP();
-  if (packetSize <= MAX_BUFFER_ARTNET && packetSize > 0)
+  if(packetSize <= MAX_BUFFER_ARTNET && packetSize > 0)
   {
       Udp.read(artnetPacket, MAX_BUFFER_ARTNET);
 
@@ -90,113 +96,25 @@ uint16_t Artnet::read()
       switch(opcode) 
       {
         // -- OpDmc or OpOutput was received, now we need to extract the DMX date from the frame.
-        case OpDmx:
+        case ART_DMX:
           sequence = artnetPacket[12];
           incomingUniverse = artnetPacket[14] | artnetPacket[15] << 8;
           dmxDataLength = artnetPacket[17] | artnetPacket[16] << 8;
 
-          // When an artDmxCallback is specified we call this function.
-          if (artDmxCallback) (*artDmxCallback)(incomingUniverse, dmxDataLength, sequence, artnetPacket + ART_DMX_START, remoteIP);
-          
-          // Return that we received ad OpDmx OpOutput packet.
-          return OpDmx;
-
+          if (artDmxCallback) 
+            (*artDmxCallback)(incomingUniverse, dmxDataLength, sequence, artnetPacket + ART_DMX_START, controllerIP);
+          return ART_DMX;
 
         // -- OpPoll received, now we have to respond with an OpPollReply message within 3 seconds.
         // fill the reply struct, and then send it to the network's broadcast address
-        case OpPoll:
-            if(DEBUG) {
-              Serial.print("POLL from ");
-              Serial.print(remoteIP);
-              Serial.print(" broadcast addr: ");
-              Serial.println(broadcast);
-            }
-
-          // FIELD 1:: Array of 8 characters, the final character is a null termination. (Always 'A' 'r' 't' '-' 'N' 'e' 't' 0x00)
-          sprintf((char *)id, "Art-Net");
-          memcpy(ArtPollReply.id, id, sizeof(ArtPollReply.id));
-
-          // FIELD 2:: OpCode = OpPollReply since this is the poll reply
-          ArtPollReply.opCode = OpPollReply;
-
-          // FIELD 3:: Get the node's local IP address. And put it in the message.
-          #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
-            IPAddress local_ip = Ethernet.localIP();
-          #else
-            IPAddress local_ip = WiFi.localIP();
-          #endif
-
-          node_ip_address[0] = local_ip[0];
-          node_ip_address[1] = local_ip[1];
-          node_ip_address[2] = local_ip[2];
-          node_ip_address[3] = local_ip[3];
-          memcpy(ArtPollReply.ip, node_ip_address, sizeof(ArtPollReply.ip));
-
-          // FIELD 4:: Port - The Port is always 0x1936
-          ArtPollReply.port =  ART_NET_PORT;
-
-          // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
-          
-          // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
-          memset(ArtPollReply.goodinput,  0x08, 4);
-          memset(ArtPollReply.goodoutput,  0x80, 4);
-          memset(ArtPollReply.porttypes,  0xc0, 4);
-
-          // FIELD 15,16:: Short and long name.
-          uint8_t shortname [18];
-          uint8_t longname [64];
-          sprintf((char *)shortname, "artnet arduino");
-          sprintf((char *)longname, "Art-Net -> Arduino Bridge");
-          memcpy(ArtPollReply.shortname, shortname, sizeof(shortname));
-          memcpy(ArtPollReply.longname, longname, sizeof(longname));
-
-          ArtPollReply.etsaman[0] = 0;
-          ArtPollReply.etsaman[1] = 0;
-          ArtPollReply.verH       = 1;
-          ArtPollReply.ver        = 0;
-          ArtPollReply.subH       = 0;
-          ArtPollReply.sub        = 0;
-          ArtPollReply.oemH       = 0;
-          ArtPollReply.oem        = 0xFF;
-          ArtPollReply.ubea       = 0;
-          ArtPollReply.status     = 0xd2;
-          ArtPollReply.swvideo    = 0;
-          ArtPollReply.swmacro    = 0;
-          ArtPollReply.swremote   = 0;
-          ArtPollReply.style      = 0;
-
-          ArtPollReply.numbportsH = 0;
-          ArtPollReply.numbports  = 4;
-          ArtPollReply.status2    = 0x08;
-
-          ArtPollReply.bindip[0] = node_ip_address[0];
-          ArtPollReply.bindip[1] = node_ip_address[1];
-          ArtPollReply.bindip[2] = node_ip_address[2];
-          ArtPollReply.bindip[3] = node_ip_address[3];
-
-          uint8_t swin[4]  = {0x01,0x02,0x03,0x04};
-          uint8_t swout[4] = {0x01,0x02,0x03,0x04};
-          for(uint8_t i = 0; i < 4; i++)
-          {
-              ArtPollReply.swout[i] = swout[i];
-              ArtPollReply.swin[i] = swin[i];
-          }
-
-          // FIELD 17:: NodeReport 
-          // Currently not compliant the Art-Net 4 specification (refer to page 21/22)
-          sprintf((char *)ArtPollReply.nodereport, "%i DMX output universes active.", ArtPollReply.numbports);
-          
-          // UDP SEND :: All fields are filled in, now we can send the package to the controller using the boardcast IP.
-          Udp.beginPacket(broadcast, ART_NET_PORT);
-          Udp.write((uint8_t *)&ArtPollReply, sizeof(ArtPollReply));
-          Udp.endPacket();
-
-          return OpPoll;
-
-        case OpSync:
-          if (artSyncCallback) (*artSyncCallback)(remoteIP);
+        case ART_POLL:
+          sendArtPollReply();
+          return ART_POLL;
         
-          return OpSync;
+        case ART_SYNC:
+          if (artSyncCallback) 
+            (*artSyncCallback)(controllerIP);
+          return ART_SYNC;
         
         default:
           if(DEBUG) {
@@ -237,7 +155,15 @@ void Artnet::printPacketContent()
 }
 
 void Artnet::setDefaults()
-{ 
+{
+  // FIELD 1:: Array of 8 characters, the final character is a null termination. (Always 'A' 'r' 't' '-' 'N' 'e' 't' 0x00)
+    sprintf((char *)id, "Art-Net");
+    memcpy(ArtPollReply.id, id, sizeof(ArtPollReply.id));
+
+  // FIELD 4:: Port - The Port is always 0x1936
+    ArtPollReply.port =  ART_NET_PORT;
+  
+  //All other fields
     ArtPollReply.etsaman[0] = 0;                  //ESTA manufacturer code Lo
     ArtPollReply.etsaman[1] = 0;                  //ESTA manufacturer code Hi
     ArtPollReply.verH       = VersionInfoH;       //Use verH for library version
@@ -250,7 +176,7 @@ void Artnet::setDefaults()
     ArtPollReply.swvideo    = 0;                  // Set to 00 when video display is showing local data.               
     ArtPollReply.swmacro    = 0;                  // Set to 0 no marcro are used
     ArtPollReply.swremote   = 0;                  // Set to 0 no remote triggers are used
-    ArtPollReply.style      = StNode;             // Set style to Standard node
+    ArtPollReply.style      = ART_ST_NODE;        // Set style to Standard node
     ArtPollReply.numbportsH = 0;
     ArtPollReply.numbports  = 4;
 
@@ -283,5 +209,77 @@ void Artnet::setDefaults()
 
 void sendArtPollReply() 
 {
+  if(DEBUG) {
+      Serial.print("POLL from ");
+      Serial.print(controllerIP);
+      Serial.print(" broadcast addr: ");
+      Serial.println(broadcastIP);
+  }
 
+  // FIELD 2:: OpCode = OpPollReply since this is the poll reply
+  ArtPollReply.opCode = ART_POLL_REPLY;
+
+  // FIELD 3:: Get the node's local IP address. And put it in the message.
+  memcpy(ArtPollReply.ip, nodeIP, sizeof(ArtPollReply.ip));
+
+  // FIELD 38:: Get the node's local IP address. And put it in the message.
+  memcpy(ArtPollReply.bindip, nodeIP, sizeof(ArtPollReply.bindip));
+  
+  // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
+  memset(ArtPollReply.goodinput,  0x08, 4);
+  memset(ArtPollReply.goodoutput,  0x80, 4);
+  memset(ArtPollReply.porttypes,  0xc0, 4);
+
+  uint8_t swin[4]  = {0x01,0x02,0x03,0x04};
+  uint8_t swout[4] = {0x01,0x02,0x03,0x04};
+  for(uint8_t i = 0; i < 4; i++)
+  {
+      ArtPollReply.swout[i] = swout[i];
+      ArtPollReply.swin[i] = swin[i];
+  }
+
+  // FIELD 17:: NodeReport 
+  // Currently not compliant the Art-Net 4 specification (refer to page 21/22)
+  sprintf((char *)ArtPollReply.nodereport, "%i DMX output universes active.", ArtPollReply.numbports);
+  
+  // UDP SEND :: All fields are filled in, now we can send the package to the controller using the boardcast IP.
+  //BUGFIX: According to Art-Net 4 the node must reply to the controller that send out the poll. Only the controller is allowed to send out broadcast opPoll's.
+  Udp.beginPacket(controllerIP, ART_NET_PORT);
+  Udp.write((uint8_t *)&ArtPollReply, sizeof(ArtPollReply));
+  Udp.endPacket();
+}
+
+// **** Function Artnet::maintainDCHP() ****
+// Descr: This function maintains the network connection with DCHP. It is only valid to use this with DCHP enabled.
+// Return:
+//    0 = nothing has changed ; renewal succes ; rebind success
+//    1 = Renew failed.
+//    3 = Rebind failed.
+inline uint16_t maintainDCHP()
+{
+  switch() {
+    case renewFailed:
+      return (uint16_t)renewFailed;
+
+    case rebindFail:
+      return (uint16_t)rebindFail;
+
+    case renewSucces:
+    case rebindSucces:
+      nodeIP = getIP();
+    case noChange:
+    default: 
+      return (uint16_t)noChange;
+  }
+}
+
+// **** Function Artnet::getIP() ****
+// Descr: Returns the IP address currently set in nodeIP.
+// Return: is IPAddress type
+inline IPAddress getIP() {
+  #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
+    return Ethernet.localIP();
+  #else
+    return WiFi.localIP();
+  #endif
 }
