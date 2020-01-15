@@ -226,9 +226,9 @@ void Artnet::sendArtPollReply()
   //memcpy(ArtPollReply.bindip, nodeIP, sizeof(ArtPollReply.bindip));
   
   // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
-  memset(ArtPollReply.goodinput,  0x08, 4);
-  memset(ArtPollReply.goodoutput,  0x80, 4);
-  memset(ArtPollReply.porttypes,  0xc0, 4);
+  memset(ArtPollReply.goodinput,  0x08, 4); // incorrect 0x80 means receiving input data without issue
+  memset(ArtPollReply.goodoutput,  0x80, 4); // correct 0x80 means transmitting output data without issue
+  memset(ArtPollReply.porttypes,  0xc0, 4); //zou eigenlijk 0x80 moeten zijn aangezien er geen inputs nodig zijn.
 
   uint8_t swin[4]  = {0x01,0x02,0x03,0x04};
   uint8_t swout[4] = {0x01,0x02,0x03,0x04};
