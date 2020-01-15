@@ -168,12 +168,14 @@ class Artnet
     Artnet();
 
       void begin(byte mac[], byte ip[]);
+      void begin(byte mac[]);
       void begin();
       void setBroadcast(byte bc[]);
       void setBroadcast(IPAddress bc);
-      uint16_t read();
-      void printPacketHeader();
-      void printPacketContent();
+      uint16_t read(void);
+      void printPacketHeader(void);
+      void printPacketContent(void);
+      IPAddress getIP(void);
 
     // **** Function Artnet::setgetDmxFrame() ****
     // Descr: This function allows the user to get the pointer to the DMX data
@@ -231,12 +233,12 @@ class Artnet
       artSyncCallback = fptr;
     }
 
-    // **** Function Artnet::getDchpStatus() ****
+/*     // **** Function Artnet::getDchpStatus() ****
     // Descr: Returns current dchp status.
     inline uint16_t getDchpStatus(void)
     {
       return (uint16_t)dchpStatus;
-    }
+    } */
 
   private:
     //Create a struct for this node.
@@ -254,7 +256,7 @@ class Artnet
       uint8_t  style;           //#The Style code defines the equipment style of the device. See Table 4 on page x for current Style codes.
     } node; */
 
-    uint8_t  node_ip_address[4];
+    //uint8_t  node_ip_address[4];
     uint8_t  id[8];
   
     #if defined(ARDUINO_SAMD_ZERO) || defined(ESP8266) || defined(ESP32)
@@ -273,8 +275,6 @@ class Artnet
     uint16_t  opcode;
     uint16_t  incomingUniverse;
     uint16_t  dmxDataLength;
-    enum Dchp {noChange, renewFailed, renewSucces, rebindFail, rebindSucces};
-    Dchp  dchpStatus;
     bool DCHP;
 
     //Create nodeIP, broadcastIP and controllerIP address
@@ -284,10 +284,10 @@ class Artnet
 
     void (*artDmxCallback)(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data, IPAddress controllerIP);
     void (*artSyncCallback)(IPAddress controllerIP);
+    void sendArtPollReply();
     void setDefaults();
-    inline uint16_t maintainDCHP();
-    inline IPAddress getIP();
-
+    uint16_t maintainDCHP();
+    
 };
 
 #endif

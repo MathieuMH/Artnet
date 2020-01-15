@@ -207,7 +207,7 @@ void Artnet::setDefaults()
     ArtPollReply.status2    = 0x08;
 }
 
-void sendArtPollReply() 
+void Artnet::sendArtPollReply() 
 {
   if(DEBUG) {
       Serial.print("POLL from ");
@@ -255,28 +255,28 @@ void sendArtPollReply()
 //    0 = nothing has changed ; renewal succes ; rebind success
 //    1 = Renew failed.
 //    3 = Rebind failed.
-inline uint16_t maintainDCHP()
+uint16_t Artnet::maintainDCHP()
 {
-  switch() {
-    case renewFailed:
-      return (uint16_t)renewFailed;
+  switch(Ethernet.maintain()) {
+    case 1:
+      return 1;
 
-    case rebindFail:
-      return (uint16_t)rebindFail;
+    case 3:
+      return 3;
 
-    case renewSucces:
-    case rebindSucces:
+    case 2:
+    case 4:
       nodeIP = getIP();
-    case noChange:
+    case 0:
     default: 
-      return (uint16_t)noChange;
+      return 0;
   }
 }
 
 // **** Function Artnet::getIP() ****
 // Descr: Returns the IP address currently set in nodeIP.
 // Return: is IPAddress type
-inline IPAddress getIP() {
+IPAddress Artnet::getIP() {
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     return Ethernet.localIP();
   #else
