@@ -220,10 +220,10 @@ void Artnet::sendArtPollReply()
   ArtPollReply.opCode = ART_POLL_REPLY;
 
   // FIELD 3:: Get the node's local IP address. And put it in the message.
-  memcpy(ArtPollReply.ip, nodeIP, sizeof(ArtPollReply.ip));
+  //memcpy(ArtPollReply.ip, nodeIP, sizeof(ArtPollReply.ip));
 
   // FIELD 38:: Get the node's local IP address. And put it in the message.
-  memcpy(ArtPollReply.bindip, nodeIP, sizeof(ArtPollReply.bindip));
+  //memcpy(ArtPollReply.bindip, nodeIP, sizeof(ArtPollReply.bindip));
   
   // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
   memset(ArtPollReply.goodinput,  0x08, 4);
