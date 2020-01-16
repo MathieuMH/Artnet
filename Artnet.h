@@ -43,7 +43,7 @@ THE SOFTWARE.
     #include <EthernetUdp.h>
 #endif
 
-#ifndef defined(DEBUG)
+#ifndef DEBUG
     #define DEBUG false
 #endif
 
@@ -106,7 +106,7 @@ const uint8_t  VersionInfoH       = 0x01;
 #define RC_PWR_FAIL               0x0002      //Hardware tests failed at Power On
 #define RC_SOCKET_WR1             0x0003      //Last UDP from Node failed due to truncated length, Most likely caused by a collision.
 #define RC_PARSE_FAIL             0x0004      //Unable to identify last UDP transmission. Check OpCode and packet length.
-#define RC_UD¨P_FAIL              0x0005      //Unable to open Udp Socket in last transmission attempt
+#define RC_UDP_FAIL               0x0005      //Unable to open Udp Socket in last transmission attempt
 #define RC_SHNAME_OK              0x0006      //Confirms that Short Name programming via ArtAddress, was successful.
 #define RC_LONAME_OK              0x0007      //Confirms that Long Name programming via ArtAddress, was successful.
 #define RC_DMX_ERROR              0x0008      //DMX512 receive errors detected.
