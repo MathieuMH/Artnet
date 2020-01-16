@@ -52,6 +52,8 @@ const uint8_t  VersionInfoH       = 0x01;
 //const uint8_t  VersionInfoL       0x01;     //VersionInfoL is not used. The user can use this to set its own version info.
 //#define WIFI_CONNECT_ATTEMTS      20          //Value is the amount of checks to see if there is WL connection.
 //#define WIFI_RETRY_DELAY          500          //Value is the amount of checks to see if there is WL connection.
+#define ART_MAX_UNIVERSES           4
+#define ART_UNIVERSE_PARAMS         3     
 
 // *** Art-Net packet related paramters
 #define   ART_NET_PORT            0x1936    // Art-Net default port = 0x1936 = 6454 (DO NOT CHANGE!!)
@@ -61,7 +63,7 @@ const uint8_t  VersionInfoH       = 0x01;
 #define   ART_NET_OP_OFFSET       8
 #define   ART_NET_ID              "Art-Net\0"    //Every Art-Net package is obligate to carry the packet ID ‘A’ ‘r’ ‘t’ ‘-‘ ‘N’ ‘e’ ‘t’ 0x00
 #define   ART_DMX_START           18             //Start byte of the DMX data in the ArtDmx packet.
-#define   SIZE_POLLREPLY          //Size in bytes of the OpPollReply message  
+#define   SIZE_POLLREPLY          20             //Size in bytes of the OpPollReply message  
 
 // *** Art-Net Opcodes
 #define  ART_POLL                 0x2000      //This is an ArtPoll packet, no other data is contained in this UDP packet.
@@ -166,10 +168,24 @@ struct artnet_reply_s {
   uint8_t  filler[26];      //#41 Transmit as zero. For future expansion.
 } __attribute__((packed));
 
+struct node_s
+{
+  uint8_t  ip[4];
+  uint8_t  etsaman[2];      //#13,14 The ESTA manufacturer code. These codes are used to represent equipment manufacturer. They are assigned by ESTA. This field can be interpreted as two ASCII bytes representing the manufacturer initials.
+  uint8_t  shortname[18];   //#15 The array represents a null terminated short name for the Node. The Controller uses the ArtAddress packet to program this string. Max length is 17 characters plus the null. This is a fixed length field, although the string it contains can be shorter than the field.
+  uint8_t  longname[64];
+  uint8_t  mac[6];
+  uint8_t  style;
+  uint16_t  oem;
+  uint16_t  version;
+  unit16_t  etsaman;
+  uint16_t universe[MAX_UNIVERSES][UNIVERSE_PRAMS];
+};
+
 class Artnet
 {
   public:
-    Artnet();
+      Artnet();
 
       void begin(byte mac[], byte ip[]);
       void begin(byte mac[]);
@@ -271,6 +287,7 @@ class Artnet
   
     // Create the Art-Net ArtPollReply packet
     struct artnet_reply_s ArtPollReply;
+    struct node_s node;
 
     // Create global private variables
     uint8_t   artnetPacket[MAX_BUFFER_ARTNET];
