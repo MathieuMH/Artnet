@@ -29,16 +29,16 @@ THE SOFTWARE.
 
 #include <Arduino.h>
 
-#if defined(ARDUINO_SAMD_ZERO)
+#if defined(ARDUINO_SAMD_ZERO)    //UNTESTED!
     #include <WiFi101.h>
     #include <WiFiUdp.h>
-#elif defined(ESP8266)
+#elif defined(ESP8266)            //UNTESTED!
     #include <ESP8266WiFi.h>
     #include <WiFiUdp.h>
-#elif defined(ESP32)
+#elif defined(ESP32)              //UNTESTED!
     #include <WiFi.h>
     #include <WiFiUdp.h>
-#else
+#else                            //TESTED WITH TEENSY 3.2 && Wiz820io
     #include <Ethernet.h>
     #include <EthernetUdp.h>
 #endif
@@ -50,16 +50,20 @@ THE SOFTWARE.
 // Art-Net Library information
 const uint8_t  VersionInfoH       = 0x01;
 //const uint8_t  VersionInfoL       0x01;     //VersionInfoL is not used. The user can use this to set its own version info.
+//#define WIFI_CONNECT_ATTEMTS      20          //Value is the amount of checks to see if there is WL connection.
+//#define WIFI_RETRY_DELAY          500          //Value is the amount of checks to see if there is WL connection.
 
 // *** Art-Net packet related paramters
 #define   ART_NET_PORT            0x1936    // Art-Net default port = 0x1936 = 6454 (DO NOT CHANGE!!)
 #define   MAX_BUFFER_ARTNET       530       // Maximum buffer size.                
 
 // Packet
+#define   ART_NET_OP_OFFSET       8
 #define   ART_NET_ID              "Art-Net\0"    //Every Art-Net package is obligate to carry the packet ID ‘A’ ‘r’ ‘t’ ‘-‘ ‘N’ ‘e’ ‘t’ 0x00
 #define   ART_DMX_START           18             //Start byte of the DMX data in the ArtDmx packet.
+#define   SIZE_POLLREPLY          //Size in bytes of the OpPollReply message  
 
-  // *** Art-Net Opcodes
+// *** Art-Net Opcodes
 #define  ART_POLL                 0x2000      //This is an ArtPoll packet, no other data is contained in this UDP packet.
 #define  ART_POLL_REPLY           0x2100      //This is an ArtPollReply Packet. It contains device status information.
 #define  ART_DIAG_DATA            0x2300      //Diagnostics and data logging packet.
@@ -169,14 +173,14 @@ class Artnet
 
       void begin(byte mac[], byte ip[]);
       void begin(byte mac[]);
-      void begin();
+      uint8_t beginWifi(byte mac[]);
       void setBroadcast(byte bc[]);
       void setBroadcast(IPAddress bc);
       uint16_t read(void);
       void printPacketHeader(void);
       void printPacketContent(void);
       IPAddress getIP(void);
-
+  
     // **** Function Artnet::setgetDmxFrame() ****
     // Descr: This function allows the user to get the pointer to the DMX data
     inline uint8_t* getDmxFrame(void)
@@ -284,6 +288,7 @@ class Artnet
 
     void (*artDmxCallback)(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data, IPAddress controllerIP);
     void (*artSyncCallback)(IPAddress controllerIP);
+    uint8_t sendPacket(uint8_t opcode, IPAddress destinationIP, uint8_t* data);
     void sendArtPollReply();
     void setDefaults();
     uint16_t maintainDCHP();

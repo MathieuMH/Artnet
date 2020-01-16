@@ -26,8 +26,15 @@ THE SOFTWARE.
 
 #include <Artnet.h>
 
-Artnet::Artnet() {}
+// **** Function Artnet::Artnet() ****
+// Descr: Constructior of the call Artnet. Called once the library is loaded. Ideally to set all default values.
+// Return: A constructor does not have a return!
+Artnet::Artnet() { }
 
+
+// **** Function Artnet::begin(mac[], ip[]) ****
+// Descr: This function enables the Ethernet module and opens the UDP port.
+// Argumenets: mac[] = the mac address to be used. Pointer to array of 6 bytes, ip[] = the static IP address. pointer to array of 4 bytes.
 void Artnet::begin(byte mac[], byte ip[])
 {
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
@@ -39,6 +46,9 @@ void Artnet::begin(byte mac[], byte ip[])
   Udp.begin(ART_NET_PORT);
 }
 
+// **** Function Artnet::begin(mac[]) ****
+// Descr: This function enables the Ethernet module and opens the UDP port.
+// Argumenets: mac[] = the mac address to be used. Pointer to array of 6 bytes, ip[] = the static IP address. pointer to array of 4 bytes.
 void Artnet::begin(byte mac[])
 {
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
@@ -52,12 +62,50 @@ void Artnet::begin(byte mac[])
   Udp.begin(ART_NET_PORT);
 }
 
-// NO MAC ADDRESS SET, REQUIRED!! no to update!
-void Artnet::begin()
+// **** Function Artnet::beginWifi(mac[]) ****
+// Descr: This function enables the WiFi module and opens the UDP port.
+// Argumenets: mac[] = the mac address to be used. Pointer to array of 6 bytes
+// Return: 0 = connection failed ; 0x01 connection succes
+/* uint8_t Artnet::beginWifi(byte mac[])
 {
-  DCHP = false;
+  int i = 0;
+
+  #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
+    Ethernet.begin(mac);
+  #endif
+
+  WiFi.begin(ssid, password);
+
+  if(DEBUG) 
+  { 
+    Serial.print("WiFi connecting to ");
+    Serial.print(ssid);
+  }
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(WIFI_RETRY_DELAY);
+    
+    if(DEBUG) Serial.print(".");
+
+    if (i > WIFI_CONNECT_ATTEMTS)
+    {
+      if(DEBUG) Serial.print(" FAILED!");  
+      return 0;
+    }
+    i++;
+
+  Serial.print("SUCCESS! IP: ");
+  Serial.println(WiFi.localIP());
+
+  //LOCAL IP NOG OPSLAAN!
+  DCHP = true;
+
+  //load the specified mac address into the ArtPollReply.mac[] array.
+  memcpy(ArtPollReply.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
-}
+  return 1;
+} */
+
 
 void Artnet::setBroadcast(byte bc[])
 {
@@ -155,7 +203,10 @@ void Artnet::printPacketContent()
 }
 
 void Artnet::setDefaults()
-{
+{ 
+  broadcastIP(2, 255, 255, 255);
+  controllerIP(2, 0, 0, 10);
+
   // FIELD 1:: Array of 8 characters, the final character is a null termination. (Always 'A' 'r' 't' '-' 'N' 'e' 't' 0x00)
     sprintf((char *)id, "Art-Net");
     memcpy(ArtPollReply.id, id, sizeof(ArtPollReply.id));
@@ -248,6 +299,48 @@ void Artnet::sendArtPollReply()
   Udp.write((uint8_t *)&ArtPollReply, sizeof(ArtPollReply));
   Udp.endPacket();
 }
+
+// **** Function Artnet::sendPacket(uint8_t opcode) ****
+// Descr: This function generates the packets and sends to the controller
+// Return: (optional)
+//    0 = UDP packet was send succesfully
+//    1 = UDP packet was not send out for some reason
+
+Artnet::sendPacket(uint8_t opcode, IPAddress destinationIP, uint8_t* data)
+{
+  uint8_t packetsize = 0;
+  uint8_t packet[MAX_BUFFER_ARTNET] = {0};
+  // Set Art-Net ID
+  sprintf((char *)id, "Art-Net");
+  memcpy(&packet[0], id, sizeof(id));
+
+  switch(opcode)
+  {
+    // -- OpPollReply
+    case ART_POLL_REPLY:
+      // Set the size of the packet to send
+      packetsize = SIZE_POLLREPLY;
+      // Set the opcode
+      packet[ART_NET_OP_OFFSET] = (ART_POLL_REPLY && 0xFF) >> 8;
+      packet[ART_NET_OP_OFFSET+1] = (ART_POLL_REPLY && 0xFF);
+      break;
+
+    // -- OpIpProgReply
+    case ART_IPPROG_REPLY:
+      return 1;
+    // -- OpTodData (future expansion)
+    case RDM_TOD_DATA:
+    // -- ArtRdmSub (future expansion)
+    case RDM_SUB:
+    default:
+      return 1;
+  }
+
+  Udp.beginPacket(destinationIP, ART_NET_PORT);
+  Udp.write((uint8_t *)&packet, sizeof(ArtPollReply));
+  return Udp.endPacket();   
+}
+
 
 // **** Function Artnet::maintainDCHP() ****
 // Descr: This function maintains the network connection with DCHP. It is only valid to use this with DCHP enabled.
