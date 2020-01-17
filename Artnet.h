@@ -3,6 +3,9 @@
 Copyright (c) 2014 Nathanaël Lécaudé
 https://github.com/natcl/Artnet, http://forum.pjrc.com/threads/24688-Artnet-to-OctoWS2811
 
+Copyright (c) 2020 Mathieu Hebbrecht
+https://github.com/MathieuMH, https://www.thieu.gent
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -22,7 +25,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-/* Credit: Art-Net™ Designed by and Copyright Artistic Licence Holdings Ltd */
+/* Art-Net™ Designed by and Copyright Artistic Licence Holdings Ltd */
 
 #ifndef ARTNET_H
 #define ARTNET_H
@@ -49,19 +52,26 @@ THE SOFTWARE.
 
 // Art-Net Library information
 const uint8_t  VersionInfoH       = 0x01;
+const char   defaultRprtMsg[50]   = "Art-Net Node\0";
+const char   defaultShortname[18] = "Arduino Node\0";
+const char   defaultLongname[64]  = "Open source Arduino node\0";
 //const uint8_t  VersionInfoL       0x01;     //VersionInfoL is not used. The user can use this to set its own version info.
-//#define WIFI_CONNECT_ATTEMTS      20          //Value is the amount of checks to see if there is WL connection.
-//#define WIFI_RETRY_DELAY          500          //Value is the amount of checks to see if there is WL connection.
+//#define WIFI_CONNECT_ATTEMTS      20        //Value is the amount of checks to see if there is WL connection.
+//#define WIFI_RETRY_DELAY          500       //Value is the amount of checks to see if there is WL connection.
 
 // *** Art-Net packet related paramters
-#define   ART_NET_PORT            0x1936    // Art-Net default port = 0x1936 = 6454 (DO NOT CHANGE!!)
-#define   MAX_BUFFER_ARTNET       530       // Maximum buffer size.                
+#define   ART_NET_PORT            0x1936      // Art-Net default port = 0x1936 = 6454 (DO NOT CHANGE!!)
+#define   ART_NET_VERSION         14          // Official Art-Net Version (Current release is 4 with revision number 14)
+#define   MAX_BUFFER_ARTNET       530         // Maximum buffer size.                
 
 // Packet
 #define   ART_NET_OP_OFFSET       8
-#define   ART_NET_ID              "Art-Net\0"    //Every Art-Net package is obligate to carry the packet ID ‘A’ ‘r’ ‘t’ ‘-‘ ‘N’ ‘e’ ‘t’ 0x00
-#define   ART_DMX_START           18             //Start byte of the DMX data in the ArtDmx packet.
-#define   SIZE_POLLREPLY          //Size in bytes of the OpPollReply message  
+#define   ART_NET_ID              "Art-Net\0" //Every Art-Net package is obligate to carry the packet ID ‘A’ ‘r’ ‘t’ ‘-‘ ‘N’ ‘e’ ‘t’ 0x00
+#define   ART_DMX_START           18          //Start byte of the DMX data in the ArtDmx packet.
+#define   ART_SIZE_POLLREPLY      238         //Size in bytes of the OpPollReply message
+#define   ART_SIZE_DMX            530         //Size in bytes of the OpPollReply message
+#define   ART_NUM_UNIVERSES       4
+#define   ART_UNIVERSE_PARAMS     4
 
 // *** Art-Net Opcodes
 #define  ART_POLL                 0x2000      //This is an ArtPoll packet, no other data is contained in this UDP packet.
@@ -166,6 +176,23 @@ struct artnet_reply_s {
   uint8_t  filler[26];      //#41 Transmit as zero. For future expansion.
 } __attribute__((packed));
 
+struct node_s {
+  uint8_t     version;
+  uint16_t    oem;
+  uint8_t     style;    
+  uint16_t    etsaman;      
+  uint8_t     shortname[18];   
+  uint8_t     longname[64];
+  uint8_t     mac[6];
+  uint8_t     ip[4];
+  boolean     dchp;
+  uint16_t    pollReplyCounter;
+  char        reportMsg[51];
+  uint16_t    nodeReportCode;
+  uint16_t    universe[ART_NUM_UNIVERSES][ART_UNIVERSE_PARAMS];     //PARAMS: 0 = universe address (0 to 32768) ;; 1 = direction (0 equals output ~ 1 equals input) ;; 2 = protocol (0 is DMX, 5 Art-Net, ... ) ;; 3 = status field refer to goodInput/output
+
+};
+
 class Artnet
 {
   public:
@@ -180,6 +207,10 @@ class Artnet
       void printPacketHeader(void);
       void printPacketContent(void);
       IPAddress getIP(void);
+      void setNodeReportMsg(char *msg[]);
+      void clearNodeReportMsg();
+      void setShortDescr(char *sname[]);
+      void setLongDescr(char *lname[]);
   
     // **** Function Artnet::setgetDmxFrame() ****
     // Descr: This function allows the user to get the pointer to the DMX data
@@ -270,16 +301,16 @@ class Artnet
     #endif
   
     // Create the Art-Net ArtPollReply packet
-    struct artnet_reply_s ArtPollReply;
+    //struct artnet_reply_s ArtPollReply;
+    struct node_s node;
 
     // Create global private variables
-    uint8_t   artnetPacket[MAX_BUFFER_ARTNET];
+    //uint8_t   artnetPacket[MAX_BUFFER_ARTNET];
     uint8_t   sequence;
     uint16_t  packetSize;
     uint16_t  opcode;
     uint16_t  incomingUniverse;
     uint16_t  dmxDataLength;
-    bool DCHP;
 
     //Create nodeIP, broadcastIP and controllerIP address
     IPAddress nodeIP;
