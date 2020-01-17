@@ -35,10 +35,7 @@ This is a basic example that will print out the header and the content of an Art
 This is similar to ArtnetReceive but uses a callback to read the data.
 
 ### Art-Net Copyright
-[Art-Net™](https://art-net.org.uk/) Designed by and Copyright Artistic Licence Holdings Ltd
-
-
-![logo](docs/Art-NetLogo.gif?raw=true "Art-Net Official logo" | width=64)
+<img src="docs/Art-NetLogo.gif?" width="64"> [Art-Net™](https://art-net.org.uk/) Designed by and Copyright Artistic Licence Holdings Ltd
 
 ## Acknowledgements
 
