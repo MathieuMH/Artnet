@@ -34,6 +34,12 @@ This is a basic example that will print out the header and the content of an Art
 
 This is similar to ArtnetReceive but uses a callback to read the data.
 
+### Art-Net Copyright
+[Art-Net™](https://art-net.org.uk/) Designed by and Copyright Artistic Licence Holdings Ltd
+
+
+![Alt text](Art-NetLogo.gif?raw=true "Art-Net Official logo")
+
 ## Acknowledgements
 
 Many thanks to virtualdave and [mortonkopf](http://orchardelica.com/wp/artnet-multiple-universe-with-teensy-3-and-octows2811) on the pjrc [forums](http://forum.pjrc.com/threads/24688-Artnet-to-OctoWS2811?highlight=artnet) for the original sketches !
