@@ -38,7 +38,7 @@ This is similar to ArtnetReceive but uses a callback to read the data.
 [Art-Net™](https://art-net.org.uk/) Designed by and Copyright Artistic Licence Holdings Ltd
 
 
-![logo](docs/Art-NetLogo.gif?raw=true "Art-Net Official logo")
+![logo](docs/Art-NetLogo.gif?raw=true "Art-Net Official logo" | width=64)
 
 ## Acknowledgements
 
