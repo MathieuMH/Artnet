@@ -185,7 +185,7 @@ struct node_s {
   uint8_t     longname[64];
   uint8_t     mac[6];
   uint8_t     ip[4];
-  boolean     dchp;
+  bool        dchp;
   uint16_t    pollReplyCounter;
   char        reportMsg[51];
   uint16_t    nodeReportCode;
@@ -256,14 +256,14 @@ class Artnet
 
     // **** Function Artnet::setArtDmxCallback() ****
     // Descr: ---
-    inline void setArtDmxCallback(void (*fptr)(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data, IPAddress controllerIP))
+    inline void setArtDmxCallback(void (*fptr)(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data, IPAddress IPAddr))
     {
       artDmxCallback = fptr;
     }
 
     // **** Function Artnet::setArtDmxCallback() ****
     // Descr: This function sets the rountine that is to be called once a OpSync command was received.
-    inline void setArtSyncCallback(void (*fptr)(IPAddress controllerIP))
+    inline void setArtSyncCallback(void (*fptr)(IPAddress IPAddr))
     {
       artSyncCallback = fptr;
     }
@@ -305,7 +305,7 @@ class Artnet
     struct node_s node;
 
     // Create global private variables
-    //uint8_t   artnetPacket[MAX_BUFFER_ARTNET];
+    uint8_t   artnetPacket[MAX_BUFFER_ARTNET];
     uint8_t   sequence;
     uint16_t  packetSize;
     uint16_t  opcode;
@@ -313,15 +313,14 @@ class Artnet
     uint16_t  dmxDataLength;
 
     //Create nodeIP, broadcastIP and controllerIP address
-    IPAddress nodeIP;
     IPAddress broadcastIP;
     IPAddress controllerIP;
 
-    void (*artDmxCallback)(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data, IPAddress controllerIP);
-    void (*artSyncCallback)(IPAddress controllerIP);
-    uint8_t sendPacket(uint8_t opcode, IPAddress destinationIP, uint8_t* data);
+    void (*artDmxCallback)(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data, IPAddress IPAddr);
+    void (*artSyncCallback)(IPAddress IPAddr);
+    uint8_t sendPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size);
+    uint8_t transferPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size);
     void sendArtPollReply();
-    void setDefaults();
     uint16_t maintainDCHP();
     
 };

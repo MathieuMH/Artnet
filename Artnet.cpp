@@ -30,8 +30,8 @@ THE SOFTWARE.
 // Descr: Constructior of the call Artnet. Called once the library is loaded. Ideally to set all default values.
 // Return: A constructor does not have a return!
 Artnet::Artnet() {
-  broadcastIP(2, 255, 255, 255);
-  controllerIP(2, 0, 0, 10);
+  broadcastIP = IPAddress(2, 255, 255, 255);
+  controllerIP = IPAddress(2, 0, 0, 10);
 }
 
 
@@ -43,9 +43,10 @@ void Artnet::begin(byte mac[], byte ip[])
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     Ethernet.begin(mac,ip);
   #endif
+  
   node.dchp = false;
   //load the specified mac address into the ArtPollReply.mac[] array.
-  memcpy(ArtPollReply.mac, mac, 6);
+  memcpy(node.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
 }
 
@@ -60,8 +61,7 @@ void Artnet::begin(byte mac[])
 
   node.dchp = true;
   //load the specified mac address into the ArtPollReply.mac[] array.
-  memcpy(ArtPollReply.mac, mac, 6);
-
+  memcpy(node.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
 }
 
@@ -161,7 +161,7 @@ uint16_t Artnet::read()
         // fill the reply struct, and then send it to the network's broadcast address
         case ART_POLL:
           //sendArtPollReply();
-          sendPacket(ART_POLL_REPLY, controllerIP, 0);
+          sendPacket(ART_POLL_REPLY, &controllerIP, 0);
           return ART_POLL;
         
         case ART_SYNC:
@@ -205,28 +205,6 @@ void Artnet::printPacketContent()
     Serial.print("  ");
   }
   Serial.println('\n');
-}
-
-void Artnet::setDefaults()
-{ 
-
-    //Satus1 field #12 of the OpPollReply packet
-    // bit0 =1 UBEA present. ;; =0 UBEA not present or corrupt
-    // bit1 =1 Capable of Remote Device Management (RDM). ;; =0 Not capable of Remote Device Management (RDM).
-    // bit2 =1 Booted from ROM. ;; =0 Normal firmware boot (from flash).
-    // bit3 =0 Not implemented, transmit as zero, receivers do not test.
-    // bit5:4 =00 Port-Address Programming Authority unknown.. ;; =01 All Port-Address set by front panel controls. ;; =10 All or part of Port-Address programmed by network or Web browser. ;; =11 Not used.
-    // bit7:8 =00 Indicator state unknown. ;; =01 Indicators in Locate / Identify Mode. ;; = 10 Indicators in Mute Mode. ;; =11 Indicators in Normal Mode.
-    ArtPollReply.status1     = 0xd2;
-
-    //Satus 2 field #40 of the OpPollReply packet
-    // bit0 =1 Product supports web browser configuration.
-    // bit1 =1 Node’s IP is DHCP configured. ;; =0 Node’s IP is manually configured.
-    // bit2 =1 Node is DHCP capable. ;; =0 Node is not DHCP capable.
-    // bit3 =1 Node supports 15 bit Port-Address (Art-Net 3 or 4) ;; =0 Node supports 8 bit Port-Address (Art-Net II).
-    // bit4 =1 Node is able to switch between Art-Net and sACN. ;; =0 Node not able to switch between Art-Net and sACN.
-    // bit5 =1 squawking. ;; =0 Not squawking.
-    ArtPollReply.status2    = 0x08;
 }
 
 // **** Function Artnet::packet(uint8_t opcode) ****
@@ -325,6 +303,7 @@ Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t* data)
         //Set the ip address
         for(int i=0 ; i < 4 ; i++)
           packet[207+i] = node.ip[i];
+
         //Set the bindIndex, an incremental number depending on universe x of the MAN_NUM_UNIVERSES
         packet[211] = univ;     //this is an incremental number for the universe.
         
@@ -359,7 +338,7 @@ Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t* data)
 // Return: (optional)
 //    0 = UDP packet was send succesfully
 //    1 = UDP packet was not send out for some reason
-Artnet::sendPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size) 
+Artnet::transferPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size) 
 {
   Udp.beginPacket(destinationIP, ART_NET_PORT);
   Udp.write((uint8_t *)packet, size);
@@ -369,7 +348,7 @@ Artnet::sendPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size)
 // **** Function setNodeReportMsg(char msg[]) ****
 // Descr: This sets the report message in the OpPollReply package to the controller. Very helpfull for debugging!
 //        NOTE that the field is limited by 50 ASCII characters.
-Artnet::setNodeReportMsg(char msg[]) 
+Artnet::setNodeReportMsg(char *msg[]) 
 {
   sprintf(&node.reportMsg,"%50c", msg);   //set the message with padding spaces ending with a \0
 }
@@ -400,7 +379,9 @@ uint16_t Artnet::maintainDCHP()
 
     case 2:
     case 4:
-      nodeIP = getIP();
+      IPAddress temp;
+      temp = getIP();
+      node.ip = temp;
     case 0:
     default: 
       return 0;
@@ -410,10 +391,27 @@ uint16_t Artnet::maintainDCHP()
 // **** Function Artnet::getIP() ****
 // Descr: Returns the IP address currently set in nodeIP.
 // Return: is IPAddress type
-IPAddress Artnet::getIP() {
+IPAddress Artnet::getIP() 
+{
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     return Ethernet.localIP();
   #else
     return WiFi.localIP();
   #endif
+}
+
+// **** Function Artnet::setShortDescr() ****
+// Descr: Enables the user to change the short description of the node.
+// NOTE: Respect the max length of the field. It is only 18 ASCI characters.
+void Artnet::setShortDescr(char *sname[]) 
+{
+
+}
+
+// **** Function Artnet::setLongDescr() ****
+// Descr: Enables the user to change the long description of the node.
+// NOTE: Respect the max length of the field. It is only 64 ASCI characters.
+void Artnet::setLongDescr(char *lname[]) 
+{
+
 }
