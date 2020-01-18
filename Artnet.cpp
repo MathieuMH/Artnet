@@ -29,7 +29,10 @@ THE SOFTWARE.
 // **** Function Artnet::Artnet() ****
 // Descr: Constructior of the call Artnet. Called once the library is loaded. Ideally to set all default values.
 // Return: A constructor does not have a return!
-Artnet::Artnet() { }
+Artnet::Artnet() {
+  broadcastIP(2, 255, 255, 255);
+  controllerIP(2, 0, 0, 10);
+}
 
 
 // **** Function Artnet::begin(mac[], ip[]) ****
@@ -40,7 +43,7 @@ void Artnet::begin(byte mac[], byte ip[])
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     Ethernet.begin(mac,ip);
   #endif
-  DCHP = false;
+  node.dchp = false;
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(ArtPollReply.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
@@ -55,7 +58,7 @@ void Artnet::begin(byte mac[])
     Ethernet.begin(mac);
   #endif
 
-  DCHP = true;
+  node.dchp = true;
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(ArtPollReply.mac, mac, 6);
 
@@ -98,7 +101,7 @@ void Artnet::begin(byte mac[])
   Serial.println(WiFi.localIP());
 
   //LOCAL IP NOG OPSLAAN!
-  DCHP = true;
+  node.dchp = true;
 
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(ArtPollReply.mac, mac, 6);
@@ -106,7 +109,8 @@ void Artnet::begin(byte mac[])
   return 1;
 } */
 
-
+// **** Function Artnet::setBroadcast() ****
+// Descr: With this function the IP can be set, either by IPAddress type or array of bytes.
 void Artnet::setBroadcast(byte bc[])
 {
   //sets the broadcast address
@@ -156,7 +160,8 @@ uint16_t Artnet::read()
         // -- OpPoll received, now we have to respond with an OpPollReply message within 3 seconds.
         // fill the reply struct, and then send it to the network's broadcast address
         case ART_POLL:
-          sendArtPollReply();
+          //sendArtPollReply();
+          sendPacket(ART_POLL_REPLY, controllerIP, 0);
           return ART_POLL;
         
         case ART_SYNC:
@@ -204,40 +209,6 @@ void Artnet::printPacketContent()
 
 void Artnet::setDefaults()
 { 
-  broadcastIP(2, 255, 255, 255);
-  controllerIP(2, 0, 0, 10);
-
-  // FIELD 1:: Array of 8 characters, the final character is a null termination. (Always 'A' 'r' 't' '-' 'N' 'e' 't' 0x00)
-    sprintf((char *)id, "Art-Net");
-    memcpy(ArtPollReply.id, id, sizeof(ArtPollReply.id));
-
-  // FIELD 4:: Port - The Port is always 0x1936
-    ArtPollReply.port =  ART_NET_PORT;
-  
-  //All other fields
-    ArtPollReply.etsaman[0] = 0;                  //ESTA manufacturer code Lo
-    ArtPollReply.etsaman[1] = 0;                  //ESTA manufacturer code Hi
-    ArtPollReply.verH       = VersionInfoH;       //Use verH for library version
-    ArtPollReply.verL       = 0;                  // User can set this value, default it is 0.
-    ArtPollReply.subH       = 0;                  
-    ArtPollReply.sub        = 0;                  
-    ArtPollReply.oemH       = 0;                  // This device has no OEM code                          
-    ArtPollReply.oemL       = 0xFF;               // This device has no OEM code 
-    ArtPollReply.ubea       = 0;                  // We don't use User Bios Extension Area therefor set to 0               
-    ArtPollReply.swvideo    = 0;                  // Set to 00 when video display is showing local data.               
-    ArtPollReply.swmacro    = 0;                  // Set to 0 no marcro are used
-    ArtPollReply.swremote   = 0;                  // Set to 0 no remote triggers are used
-    ArtPollReply.style      = ART_ST_NODE;        // Set style to Standard node
-    ArtPollReply.numbportsH = 0;
-    ArtPollReply.numbports  = 4;
-
-    // FIELD 15,16:: Short and long name.
-    uint8_t shortname [18];
-    uint8_t longname [64];
-    sprintf((char *)shortname, "artnet arduino");
-    sprintf((char *)longname, "Art-Net -> Arduino Bridge");
-    memcpy(ArtPollReply.shortname, shortname, sizeof(shortname));
-    memcpy(ArtPollReply.longname, longname, sizeof(longname));
 
     //Satus1 field #12 of the OpPollReply packet
     // bit0 =1 UBEA present. ;; =0 UBEA not present or corrupt
@@ -258,55 +229,12 @@ void Artnet::setDefaults()
     ArtPollReply.status2    = 0x08;
 }
 
-void Artnet::sendArtPollReply() 
-{
-  if(DEBUG) {
-      Serial.print("POLL from ");
-      Serial.print(controllerIP);
-      Serial.print(" broadcast addr: ");
-      Serial.println(broadcastIP);
-  }
-
-  // FIELD 2:: OpCode = OpPollReply since this is the poll reply
-  ArtPollReply.opCode = ART_POLL_REPLY;
-
-  // FIELD 3:: Get the node's local IP address. And put it in the message.
-  //memcpy(ArtPollReply.ip, nodeIP, sizeof(ArtPollReply.ip));
-
-  // FIELD 38:: Get the node's local IP address. And put it in the message.
-  //memcpy(ArtPollReply.bindip, nodeIP, sizeof(ArtPollReply.bindip));
-  
-  // FIELD 5,6:: VersInfoH, VersInfoL are specified in the ARtnet.h file.
-  memset(ArtPollReply.goodinput,  0x08, 4); // incorrect 0x80 means receiving input data without issue
-  memset(ArtPollReply.goodoutput,  0x80, 4); // correct 0x80 means transmitting output data without issue
-  memset(ArtPollReply.porttypes,  0xc0, 4); //zou eigenlijk 0x80 moeten zijn aangezien er geen inputs nodig zijn.
-
-  uint8_t swin[4]  = {0x01,0x02,0x03,0x04};
-  uint8_t swout[4] = {0x01,0x02,0x03,0x04};
-  for(uint8_t i = 0; i < 4; i++)
-  {
-      ArtPollReply.swout[i] = swout[i];
-      ArtPollReply.swin[i] = swin[i];
-  }
-
-  // FIELD 17:: NodeReport 
-  // Currently not compliant the Art-Net 4 specification (refer to page 21/22)
-  sprintf((char *)ArtPollReply.nodereport, "%i DMX output universes active.", ArtPollReply.numbports);
-  
-  // UDP SEND :: All fields are filled in, now we can send the package to the controller using the boardcast IP.
-  //BUGFIX: According to Art-Net 4 the node must reply to the controller that send out the poll. Only the controller is allowed to send out broadcast opPoll's.
-  Udp.beginPacket(controllerIP, ART_NET_PORT);
-  Udp.write((uint8_t *)&ArtPollReply, sizeof(ArtPollReply));
-  Udp.endPacket();
-}
-
-// **** Function Artnet::sendPacket(uint8_t opcode) ****
+// **** Function Artnet::packet(uint8_t opcode) ****
 // Descr: This function generates the packets and sends to the controller
 // Return: (optional)
 //    0 = UDP packet was send succesfully
 //    1 = UDP packet was not send out for some reason
-
-Artnet::sendPacket(uint8_t opcode, IPAddress destinationIP, uint8_t* data)
+Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t* data)
 {
   uint8_t packetsize = 0;
   uint8_t packet[MAX_BUFFER_ARTNET] = {0};
@@ -318,12 +246,101 @@ Artnet::sendPacket(uint8_t opcode, IPAddress destinationIP, uint8_t* data)
   {
     // -- OpPollReply
     case ART_POLL_REPLY:
-      // Set the size of the packet to send
-      packetsize = SIZE_POLLREPLY;
-      // Set the opcode
-      packet[ART_NET_OP_OFFSET] = (ART_POLL_REPLY && 0xFF) >> 8;
-      packet[ART_NET_OP_OFFSET+1] = (ART_POLL_REPLY && 0xFF);
-      break;
+      for(int univ=0 ; univ < ART_NUM_UNIVERSES) {
+        // Set the size of the packet to send, relevant to send out the packet.
+        packetsize = SIZE_POLLREPLY;
+        // Set the opcode
+        packet[ART_NET_OP_OFFSET] = ART_POLL_REPLY >> 8;
+        packet[ART_NET_OP_OFFSET+1] = ART_POLL_REPLY;
+
+        //set IP address
+        for(int i=0 ; i < 4 ; i++)
+          packet[10+i] = node.ip[i];
+
+        // Set artnet port number
+        packet[14] = ART_NET_PORT >> 8);
+        packet[15] = ART_NET_PORT;
+
+        //Set VersionVersion High, Low
+        packet[15] = VersionInfoH;
+        packet[16] = node.version;
+
+        //Net and Sub switch are part of the Port-Address
+        packet[18] = (uint8_t)(node.universe[univ][0] & 0x7F00) >> 8;       //Net switch :: Only bits 14 to 8 are relevant and should be placed in this byte.
+        packet[19] = (uint8_t)(node.universe[univ][0] & 0x00F0) >> 4;       //SubNet switch :: Only bits 7 to 4 are relevant and should be placed in this byte.
+
+        //Satus1 field
+          // bit0 =1 UBEA present. ;; =0 UBEA not present or corrupt
+          // bit1 =1 Capable of Remote Device Management (RDM). ;; =0 Not capable of Remote Device Management (RDM).
+          // bit2 =1 Booted from ROM. ;; =0 Normal firmware boot (from flash).
+          // bit3 =0 Not implemented, transmit as zero, receivers do not test.
+          // bit5:4 =00 Port-Address Programming Authority unknown.. ;; =01 All Port-Address set by front panel controls. ;; =10 All or part of Port-Address programmed by network or Web browser. ;; =11 Not used.
+          // bit7:8 =00 Indicator state unknown. ;; =01 Indicators in Locate / Identify Mode. ;; = 10 Indicators in Mute Mode. ;; =11 Indicators in Normal Mode.
+        packet[23] = 0xC0;              //status1 field:: currently set to normal mode for display status.
+
+        // Set node identification OEM code, ESTA Man
+        packet[20] = node.oem >> 8);
+        packet[21] = node.oem;
+        packet[24] = node.etsaman;
+        packet[25] = node.etsaman >> 8;
+
+        //Set the long name fields max 18 bytes
+        for(int i=0 ; i < sizeof(node.shortname) ; i++)
+          packet[26+i] = node.shortname[i];
+
+        //Set the long name fields max 64 bytes
+        for(int i=0 ; i < 64 ; i++)
+          packet[44+i] = node.longname[i];
+        
+        //Set the node report message
+        sprintf(&packet[108],"#%d04 [%04X] %50c", node.nodeReportCode, node.pollReplyCounter, node.reportMsg);
+        
+        if(node.pollReplyCounter == 9999)
+          node.pollReplyCounter = 0;
+        else
+          node.pollReplyCounter++;
+        
+        // Set the NumPorts, this will be one since we are going to send a OpPortReply for each port as defined in the Art-Net 4 spec.
+        packet[173] = 1;
+        packet[174] = (node.universe[univ][1] == 0) ? 0x80 : 0x40;   // Set 0x80 is the port is an output or input
+        packet[174] |= node.universe[univ][2];                       // Set the used protol.
+
+        //Good input / good output
+        packet[178] |= (node.universe[univ][3] >> 8);               //Upper byte represents good input
+        packet[172] |= node.universe[univ][3];                      //Lower byte represents good output
+        
+        //Set Swin/Swout values
+        if(node.universe[univ][1] == 1)                              //if the universe is an input universe then swin is set otherwise swout
+          packet[186] |= (node.universe[univ][3] & 0x0F);           //Swin bits 3-0 represent a part of the 15 bits port address.
+        else
+          packet[190] |= (node.universe[univ][3] & 0x0F);           //Swout bits 3-0 represent a part of the 15 bits port address.
+
+        //set the style of the node
+        packet[200] = node.style;
+
+        //Set the mac address
+        for(int i=0 ; i < 6 ; i++)
+          packet[201+i] = node.mac[i];
+
+        //Set the ip address
+        for(int i=0 ; i < 4 ; i++)
+          packet[207+i] = node.ip[i];
+        //Set the bindIndex, an incremental number depending on universe x of the MAN_NUM_UNIVERSES
+        packet[211] = univ;     //this is an incremental number for the universe.
+        
+        //Status 2 field
+          // bit0 =1 Product supports web browser configuration.
+          // bit1 =1 Node’s IP is DHCP configured. ;; =0 Node’s IP is manually configured.
+          // bit2 =1 Node is DHCP capable. ;; =0 Node is not DHCP capable.
+          // bit3 =1 Node supports 15 bit Port-Address (Art-Net 3 or 4) ;; =0 Node supports 8 bit Port-Address (Art-Net II).
+          // bit4 =1 Node is able to switch between Art-Net and sACN. ;; =0 Node not able to switch between Art-Net and sACN.
+          // bit5 =1 squawking. ;; =0 Not squawking.
+        packet[212] = (node.dchp == 1) ? 0x0E : 0x0C;       //If connected through DCHP the result is 0xE0 otherwise 0x0C bit 2 is the only relevant one.
+
+        //Give the above prepaired buffer so I can be send out to the controller.
+        sendPacket(destinationIP, packet, packetsize);
+      }
+      return 1;
 
     // -- OpIpProgReply
     case ART_IPPROG_REPLY:
@@ -334,11 +351,35 @@ Artnet::sendPacket(uint8_t opcode, IPAddress destinationIP, uint8_t* data)
     case RDM_SUB:
     default:
       return 1;
-  }
+  } 
+}
 
+// **** Function Artnet::sendPacket() ****
+// Descr: This function generates the packets and sends to the controller
+// Return: (optional)
+//    0 = UDP packet was send succesfully
+//    1 = UDP packet was not send out for some reason
+Artnet::sendPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size) 
+{
   Udp.beginPacket(destinationIP, ART_NET_PORT);
-  Udp.write((uint8_t *)&packet, sizeof(ArtPollReply));
-  return Udp.endPacket();   
+  Udp.write((uint8_t *)packet, size);
+  return Udp.endPacket(); 
+}
+
+// **** Function setNodeReportMsg(char msg[]) ****
+// Descr: This sets the report message in the OpPollReply package to the controller. Very helpfull for debugging!
+//        NOTE that the field is limited by 50 ASCII characters.
+Artnet::setNodeReportMsg(char msg[]) 
+{
+  sprintf(&node.reportMsg,"%50c", msg);   //set the message with padding spaces ending with a \0
+}
+
+// **** Function clearNodeReportMsg(char msg[]) ****
+// Descr: This clear the report message in the OpPollReply package.
+Artnet::clearNodeReportMsg() 
+{
+  char msg[] = 0x20;
+  sprintf(&node.reportMsg,"%50c", msg);   //set space with padding spaces ending with a \0
 }
 
 
