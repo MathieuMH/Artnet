@@ -57,7 +57,7 @@ const char   defaultShortname[18] = "Arduino Node\0";
 const char   defaultLongname[64]  = "Open source Arduino node\0";
 //const uint8_t  VersionInfoL       0x01;     //VersionInfoL is not used. The user can use this to set its own version info.
 //#define WIFI_CONNECT_ATTEMTS      20        //Value is the amount of checks to see if there is WL connection.
-//#define WIFI_RETRY_DELAY          500       //Value is the amount of checks to see if there is WL connection.
+#define RETRY_DELAY               500              //Retry delay time
 
 // *** Art-Net packet related paramters
 #define   ART_NET_PORT            0x1936      // Art-Net default port = 0x1936 = 6454 (DO NOT CHANGE!!)
@@ -94,7 +94,7 @@ const char   defaultLongname[64]  = "Open source Arduino node\0";
 #define  ART_MAC_MASTER           0xf000      //This packet is deprecated.
 #define  ART_MAC_SLAVE            0xf100      //This packet is deprecated.
 #define  ART_FW_MASTER            0xf200      //This is an ArtFirmwareMaster packet. It is used to upload new firmware or firmware extensions to the Node.
-#define  ART_FW__REPLY            0xf300      //This is an ArtFirmwareReply packet. It is returned by the node to acknowledge receipt of an ArtFirmwareMaster packet or ArtFileTnMaster packet.
+#define  ART_FW_REPLY             0xf300      //This is an ArtFirmwareReply packet. It is returned by the node to acknowledge receipt of an ArtFirmwareMaster packet or ArtFileTnMaster packet.
 #define  ART_FW_TNMASTER          0xf400      //Uploads user file to node
 #define  ART_FW_FNMASTER          0xf500      //Downloads user file from node.
 #define  ART_FW_FNREPLY           0xf600      //Server to Node acknowledge for download packets.
@@ -138,59 +138,20 @@ const char   defaultLongname[64]  = "Open source Arduino node\0";
 #define ART_ST_CONFIG             0x05        //A configuration or diagnostic tool.
 #define ART_ST_VISUAL             0x06        //A visualiser.
 
-struct artnet_reply_s {
-  uint8_t  id[8];           //#1 Array of 8 characters, the final character is a null termination. Value = ‘A’ ‘r’ ‘t’ ‘-‘ ‘N’ ‘e’ ‘t’ 0x00
-  uint16_t opCode;          //#2 OpPollRepl (Transmitted low byte first.)
-  uint8_t  ip[4];           //#3 Array containing the Node’s IP address. First array entry is most significant byte of address.
-  uint16_t port;            //#4 The Port is always 0x1936 (Transmitted low byte first.)
-  uint8_t  verH;            //#5 High byte of Node’s firmware revision number. The Controller should only use this field to decide if a firmware update should proceed. The convention is that a higher number is a more recent release of firmware.
-  uint8_t  verL;            //#6 Low byte of Node’s firmware revision number.
-  uint8_t  subH;            //#7 Bits 14-8 of the 15 bit Port-Address are encoded into the bottom 7 bits of this field. This is used in combination with SubSwitch and SwIn[] or SwOut[] to produce the full universe address.
-  uint8_t  sub;             //#8 Bits 7-4 of the 15 bit Port-Address are encoded into the bottom 4 bits of this field. This is used in combination with NetSwitch and SwIn[] or SwOut[] to produce the full universe address.
-  uint8_t  oemH;            //#9 The high byte of the Oem value.
-  uint8_t  oemL;            //#10 The low byte of the Oem value. The Oem word describes the equipment vendor and the feature set available. Bit 15 high indicates extended features available. Current registered codes are defined in Table 2.
-  uint8_t  ubea;            //#11 This field contains the firmware version of the User Bios Extension Area (UBEA). If the UBEA is not programmed, this field contains zero.
-  uint8_t  status1;         //#12 General Status register containing bit fields refer to Art-Net 4 specification page 20.
-  uint8_t  etsaman[2];      //#13,14 The ESTA manufacturer code. These codes are used to represent equipment manufacturer. They are assigned by ESTA. This field can be interpreted as two ASCII bytes representing the manufacturer initials.
-  uint8_t  shortname[18];   //#15 The array represents a null terminated short name for the Node. The Controller uses the ArtAddress packet to program this string. Max length is 17 characters plus the null. This is a fixed length field, although the string it contains can be shorter than the field.
-  uint8_t  longname[64];    //#16 The array represents a null terminated long name for the Node. The Controller uses the ArtAddress packet to program this string. Max length is 63 characters plus the null. This is a fixed length field, although the string it contains can be shorter than the field.
-  uint8_t  nodereport[64];  //#17 The array is a textual report of the Node’s operating status or operational errors. It is primarily intended for ‘engineering’ data.
-  uint8_t  numbportsH;      //#18 The high byte of the word describing the number of input or output ports. The high byte is for future expansion and is currently zero.
-  uint8_t  numbports;       //#19 The low byte of the word describing the number of input or output ports. If number of inputs is not equal to number of outputs, the largest value is taken. Zero is a legal value if no input or output ports are implemented. The maximum value is 4. Nodes can ignore this field as the information is implicit in PortTypes[].
-  uint8_t  porttypes[4];    //#20 This array defines the operation and protocol of each channel. (A product with 4 inputs and 4 outputs would report 0xc0, 0xc0, 0xc0, 0xc0). The array length is fixed, independent of the number of inputs or outputs physically available on the Node.
-  uint8_t  goodinput[4];    //#21 This array defines input status of the node.
-  uint8_t  goodoutput[4];   //#22 This array defines output status of the node.
-  uint8_t  swin[4];         //#23 Bits 3-0 of the 15 bit Port-Address for each of the 4 possible input ports are encoded into the low nibble.
-  uint8_t  swout[4];        //#24 Bits 3-0 of the 15 bit Port-Address for each of the 4 possible output ports are encoded into the low nibble.
-  uint8_t  swvideo;         //#25 Set to 00 when video display is showing local data. Set to 01 when video is showing ethernet data. The field is now deprecated
-  uint8_t  swmacro;         //#26 If the Node supports macro key inputs, this byte represents the trigger values. The Node is responsible for ‘debouncing’ inputs. When the ArtPollReply is set to transmit
-  uint8_t  swremote;        //#27 If the Node supports remote trigger inputs, this byte represents the trigger values. The Node is responsible for ‘debouncing’ inputs.
-  uint8_t  sp1;             //#28 Spare:: not used set to zero
-  uint8_t  sp2;             //#29 Spare:: not used set to zero
-  uint8_t  sp3;             //#30 Spare:: not used set to zero  
-  uint8_t  style;           //#31 The Style code defines the equipment style of the device. See Table 4 on page x for current Style codes.
-  uint8_t  mac[6];          //#32,33, 34, 35,36, 37 Mac Address
-  uint8_t  bindip[4];       //#38 If this unit is part of a larger or modular product, this is the IP of the root device.
-  uint8_t  bindindex;       //#39 This number represents the order of bound devices. A lower number means closer to root device. A value of 1 means root device.
-  uint8_t  status2;         //#40 Satus 2 field, refer to Art-Net Specification p25.
-  uint8_t  filler[26];      //#41 Transmit as zero. For future expansion.
-} __attribute__((packed));
-
 struct node_s {
-  uint8_t     version;
-  uint16_t    oem;
-  uint8_t     style;    
-  uint16_t    etsaman;      
-  uint8_t     shortname[18];   
-  uint8_t     longname[64];
-  uint8_t     mac[6];
-  uint8_t     ip[4];
+  uint8_t     version;                        //High byte of Node’s firmware revision number. The Controller should only use this field to decide if a firmware update should proceed. The convention is that a higher number is a more recent release of firmware.
+  uint16_t    oem;                            //The low byte of the Oem value. The Oem word describes the equipment vendor and the feature set available. Bit 15 high indicates extended features available. Current registered codes are defined in Table 2.
+  uint8_t     style;                          //#The Style code defines the equipment style of the device. See Table 4 on page x for current Style codes.
+  uint16_t    etsaman;                        //The ESTA manufacturer code. These codes are used to represent equipment manufacturer. They are assigned by ESTA. This field can be interpreted as two ASCII bytes representing the manufacturer initials.      
+  uint8_t     shortname[18];                  //The array represents a null terminated short name for the Node. The Controller uses the ArtAddress packet to program this string. Max length is 17 characters plus the null. This is a fixed length field, although the string it contains can be shorter than the field.   
+  uint8_t     longname[64];                   //The array represents a null terminated long name for the Node. The Controller uses the ArtAddress packet to program this string. Max length is 63 characters plus the null. This is a fixed length field, although the string it contains can be shorter than the field. 
+  uint8_t     mac[6];                         //Mac Address    
+  uint8_t     ip[4];                          //Array containing the Node’s IP address. First array entry is most significant byte of address.
   bool        dchp;
   uint16_t    pollReplyCounter;
   char        reportMsg[51];
   uint16_t    nodeReportCode;
   uint16_t    universe[ART_NUM_UNIVERSES][ART_UNIVERSE_PARAMS];     //PARAMS: 0 = universe address (0 to 32768) ;; 1 = direction (0 equals output ~ 1 equals input) ;; 2 = protocol (0 is DMX, 5 Art-Net, ... ) ;; 3 = status field refer to goodInput/output
-
 };
 
 class Artnet
@@ -207,10 +168,10 @@ class Artnet
       void printPacketHeader(void);
       void printPacketContent(void);
       IPAddress getIP(void);
-      void setNodeReportMsg(char *msg[]);
+      void setNodeReportMsg(char *msg);
       void clearNodeReportMsg();
-      void setShortDescr(char *sname[]);
-      void setLongDescr(char *lname[]);
+      void setShortDescr(char *sname);
+      void setLongDescr(char *lname);
   
     // **** Function Artnet::setgetDmxFrame() ****
     // Descr: This function allows the user to get the pointer to the DMX data
@@ -276,32 +237,12 @@ class Artnet
     } */
 
   private:
-    //Create a struct for this node.
-/*     struct artnet_node {
-      uint8_t  ip[4];           //Array containing the Node’s IP address. First array entry is most significant byte of address.
-      uint8_t  mac[6];          //Mac Address
-      uint8_t  FWverH;          //High byte of Node’s firmware revision number. The Controller should only use this field to decide if a firmware update should proceed. The convention is that a higher number is a more recent release of firmware.
-      uint8_t  FWverL;          //Low byte of Node’s firmware revision number.
-      uint8_t  oemH;            //The high byte of the Oem value.
-      uint8_t  oemL;            //The low byte of the Oem value. The Oem word describes the equipment vendor and the feature set available. Bit 15 high indicates extended features available. Current registered codes are defined in Table 2.
-      uint8_t  ubea = 0;        //This field contains the firmware version of the User Bios Extension Area (UBEA). If the UBEA is not programmed, this field contains zero.
-      uint8_t  etsaman[2];      //The ESTA manufacturer code. These codes are used to represent equipment manufacturer. They are assigned by ESTA. This field can be interpreted as two ASCII bytes representing the manufacturer initials.
-      uint8_t  shortname[18];   //The array represents a null terminated short name for the Node. The Controller uses the ArtAddress packet to program this string. Max length is 17 characters plus the null. This is a fixed length field, although the string it contains can be shorter than the field.
-      uint8_t  longname[64];    //The array represents a null terminated long name for the Node. The Controller uses the ArtAddress packet to program this string. Max length is 63 characters plus the null. This is a fixed length field, although the string it contains can be shorter than the field.
-      uint8_t  style;           //#The Style code defines the equipment style of the device. See Table 4 on page x for current Style codes.
-    } node; */
-
-    //uint8_t  node_ip_address[4];
-    uint8_t  id[8];
-  
     #if defined(ARDUINO_SAMD_ZERO) || defined(ESP8266) || defined(ESP32)
       WiFiUDP Udp;
     #else
       EthernetUDP Udp;
     #endif
-  
-    // Create the Art-Net ArtPollReply packet
-    //struct artnet_reply_s ArtPollReply;
+
     struct node_s node;
 
     // Create global private variables
@@ -311,6 +252,7 @@ class Artnet
     uint16_t  opcode;
     uint16_t  incomingUniverse;
     uint16_t  dmxDataLength;
+    uint8_t  id[8];
 
     //Create nodeIP, broadcastIP and controllerIP address
     IPAddress broadcastIP;
@@ -318,7 +260,7 @@ class Artnet
 
     void (*artDmxCallback)(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data, IPAddress IPAddr);
     void (*artSyncCallback)(IPAddress IPAddr);
-    uint8_t sendPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size);
+    uint8_t sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *data, uint16_t datasize);
     uint8_t transferPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size);
     void sendArtPollReply();
     uint16_t maintainDCHP();
