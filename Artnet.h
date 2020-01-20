@@ -138,6 +138,14 @@ const char   defaultLongname[64]  = "Open source Arduino node\0";
 #define ART_ST_CONFIG             0x05        //A configuration or diagnostic tool.
 #define ART_ST_VISUAL             0x06        //A visualiser.
 
+// *** Art-Net Node configuration commmands:
+#define ART_AC_NONE               0x00        //No Action
+#define ART_AC_CANCEL             0x01        //If Node is currently in merge mode, cancel merge mode upon receipt of next ArtDmx packet. See discussion of merge mode operation.
+#define ART_AC_LED_NORMAL         0x02        //The front panel indicators of the Node operate normally.
+#define ART_AC_LED_MUTE           0x03        //The front panel indicators of the Node are disabled and switched off.
+#define ART_AC_LED_LOCATE         0x04        //Rapid flashing of the Node’s front panel indicators. It is intended as an outlet identifier for large installations.
+#define ART_AC_RESET_RX           0x05        //Resets the Node’s Sip, Text, Test and data error flags. If an output short is being flagged, forces the test to re-run.
+
 struct node_s {
   uint8_t     version;                        //High byte of Node’s firmware revision number. The Controller should only use this field to decide if a firmware update should proceed. The convention is that a higher number is a more recent release of firmware.
   uint16_t    oem;                            //The low byte of the Oem value. The Oem word describes the equipment vendor and the feature set available. Bit 15 high indicates extended features available. Current registered codes are defined in Table 2.
@@ -264,6 +272,7 @@ class Artnet
     uint8_t transferPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size);
     void sendArtPollReply();
     uint16_t maintainDCHP();
+    uint8_t  setCmd(uint8_t cmd);
     
 };
 
