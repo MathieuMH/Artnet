@@ -30,8 +30,8 @@ THE SOFTWARE.
 // Descr: Constructior of the call Artnet. Called once the library is loaded. Ideally to set all default values.
 // Return: A constructor does not have a return!
 Artnet::Artnet() {
-  broadcastIP = IPAddress(2, 255, 255, 255);
-  controllerIP = IPAddress(2, 0, 0, 10);
+  //broadcastIP = IPAddress(2, 255, 255, 255);
+  //controllerIP = IPAddress(2, 0, 0, 10);
 }
 
 
@@ -48,6 +48,7 @@ void Artnet::begin(byte mac[], byte ip[])
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(node.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
+  Serial.println("Begin routine ended.1");
 }
 
 // **** Function Artnet::begin(mac[]) ****
@@ -63,6 +64,7 @@ void Artnet::begin(byte mac[])
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(node.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
+  Serial.println("Begin routine ended.1");
 }
 
 // **** Function Artnet::beginWifi(mac[]) ****
@@ -128,13 +130,18 @@ void Artnet::setBroadcast(IPAddress bc)
 //    In case a supported opcode was received the opcode is returned.
 //    In all other cases 0.
 uint16_t Artnet::read()
-{
-  packetSize = Udp.parsePacket();
+{ 
+  Serial.println("read entry");
   controllerIP = Udp.remoteIP();
+  Serial.println(Udp.remotePort());
+  packetSize = Udp.parsePacket();
+  Serial.println(packetSize);
+  Serial.println(controllerIP);
 
   if(packetSize <= MAX_BUFFER_ARTNET && packetSize > 0)
   {
       Udp.read(artnetPacket, MAX_BUFFER_ARTNET);
+      Serial.println("Packet");
 
       // Check that packetID is "Art-Net" otherwise ignore this packet
       for (byte i = 0 ; i < 8 ; i++)
