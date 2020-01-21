@@ -34,13 +34,13 @@ Artnet::Artnet() {
   //controllerIP = IPAddress(2, 0, 0, 10);
 }
 
-
 // **** Function Artnet::begin(mac[], ip[]) ****
 // Descr: This function enables the Ethernet module and opens the UDP port.
 // Argumenets: mac[] = the mac address to be used. Pointer to array of 6 bytes, ip[] = the static IP address. pointer to array of 4 bytes.
 void Artnet::begin(byte mac[], byte ip[])
 {
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
+    Ethernet.init(0);
     Ethernet.begin(mac,ip);
   #endif
   
@@ -48,7 +48,6 @@ void Artnet::begin(byte mac[], byte ip[])
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(node.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
-  Serial.println("Begin routine ended.1");
 }
 
 // **** Function Artnet::begin(mac[]) ****
@@ -57,6 +56,7 @@ void Artnet::begin(byte mac[], byte ip[])
 void Artnet::begin(byte mac[])
 {
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
+    Ethernet.init(0);
     Ethernet.begin(mac);
   #endif
 
@@ -64,7 +64,6 @@ void Artnet::begin(byte mac[])
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(node.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
-  Serial.println("Begin routine ended.1");
 }
 
 // **** Function Artnet::beginWifi(mac[]) ****
@@ -131,17 +130,13 @@ void Artnet::setBroadcast(IPAddress bc)
 //    In all other cases 0.
 uint16_t Artnet::read()
 { 
-  Serial.println("read entry");
-  controllerIP = Udp.remoteIP();
-  Serial.println(Udp.remotePort());
+
   packetSize = Udp.parsePacket();
-  Serial.println(packetSize);
-  Serial.println(controllerIP);
 
   if(packetSize <= MAX_BUFFER_ARTNET && packetSize > 0)
   {
+      controllerIP = Udp.remoteIP();
       Udp.read(artnetPacket, MAX_BUFFER_ARTNET);
-      Serial.println("Packet");
 
       // Check that packetID is "Art-Net" otherwise ignore this packet
       for (byte i = 0 ; i < 8 ; i++)
@@ -156,6 +151,16 @@ uint16_t Artnet::read()
       {
         // -- OpDmc or OpOutput was received, now we need to extract the DMX date from the frame.
         case ART_DMX:
+          if(DEBUG)
+          {
+            Serial.print("ArtDmx Received universe [");
+            Serial.print(getUniverse());
+            Serial.print("] with length of ");
+            Serial.print(getLength());
+            Serial.print("bytes. Packet sequence is: ");
+            Serial.println(getSequence());
+          }
+            
           sequence = artnetPacket[12];
           incomingUniverse = artnetPacket[14] | artnetPacket[15] << 8;
           dmxDataLength = artnetPacket[17] | artnetPacket[16] << 8;
@@ -167,18 +172,24 @@ uint16_t Artnet::read()
         // -- OpPoll received, now we have to respond with an OpPollReply message within 3 seconds.
         // fill the reply struct, and then send it to the network's broadcast address
         case ART_POLL:
+          if(DEBUG)
+            Serial.println("ArtPoll Received.");
           if(sendPacket(ART_POLL_REPLY, controllerIP, artnetPacket, 0))
             return ART_POLL;
           else
             return 0; 
-          
+
+        // -- OpSync received, this is the trigger to enable all outputs so they are syncronized. 
         case ART_SYNC:
           if (artSyncCallback) 
             (*artSyncCallback)(controllerIP);
           return ART_SYNC;
         
+        // -- OpAddress received, now we have to respond with an OpPollReply message within 3 seconds with to confirm the changes.
         case ART_ADDRESS:
         {
+          if(DEBUG)
+            Serial.println("ArtAddress Received.");
           uint8_t bindIndex = artnetPacket[13]-1; 
           //Update port address:
           uint16_t tempPortAddr = 0;
