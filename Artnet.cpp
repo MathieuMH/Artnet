@@ -29,10 +29,7 @@ THE SOFTWARE.
 // **** Function Artnet::Artnet() ****
 // Descr: Constructior of the call Artnet. Called once the library is loaded. Ideally to set all default values.
 // Return: A constructor does not have a return!
-Artnet::Artnet() {
-  //broadcastIP = IPAddress(2, 255, 255, 255);
-  //controllerIP = IPAddress(2, 0, 0, 10);
-}
+Artnet::Artnet() {}
 
 // **** Function Artnet::begin(mac[], ip[]) ****
 // Descr: This function enables the Ethernet module and opens the UDP port.
@@ -64,6 +61,10 @@ void Artnet::begin(byte mac[])
   //load the specified mac address into the ArtPollReply.mac[] array.
   memcpy(node.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
+
+  IPAddress temp = getIP();
+      for(int i=0 ; i < 4 ; i++)
+        node.ip[i] = temp[i];
 }
 
 // **** Function Artnet::beginWifi(mac[]) ****
@@ -295,15 +296,12 @@ uint8_t Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *da
   {
     // -- OpPollReply
     case ART_POLL_REPLY:
-    {
-      int retryCount = 0;
-
       for(uint16_t univ=0 ; univ < ART_NUM_UNIVERSES ; univ++) {
         // Set the size of the packet to send, relevant to send out the packet.
         packetsize = ART_SIZE_POLLREPLY;
         // Set the opcode
-        packet[ART_NET_OP_OFFSET] = (uint8_t)(ART_POLL_REPLY >> 8);
-        packet[ART_NET_OP_OFFSET+1] = (uint8_t)ART_POLL_REPLY;
+        packet[ART_NET_OP_OFFSET] = (uint8_t)ART_POLL_REPLY;
+        packet[ART_NET_OP_OFFSET+1] = (uint8_t)(ART_POLL_REPLY >> 8);
 
         //set IP address
         for(int i=0 ; i < 4 ; i++)
@@ -314,8 +312,8 @@ uint8_t Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *da
           packet[15] = (uint8_t)ART_NET_PORT;
 
           //Set VersionVersion High, Low
-          packet[15] = VersionInfoH;
-          packet[16] = node.version;
+          packet[16] = VersionInfoH;
+          packet[17] = node.version;
 
           //Net and Sub switch are part of the Port-Address
           packet[18] = (uint8_t)(node.universe[univ][0] & 0x7F00) >> 8;       //Net switch :: Only bits 14 to 8 are relevant and should be placed in this byte.
@@ -345,7 +343,8 @@ uint8_t Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *da
             packet[44+i] = node.longname[i];
         
           //Set the node report message
-          sprintf((char *)&packet[108],"#%d04 [%04X] %50s", node.nodeReportCode, node.pollReplyCounter, node.reportMsg);
+          //sprintf((char *)&packet[108],"#%d04 [%04X] %50s", node.nodeReportCode, node.pollReplyCounter, node.reportMsg);
+          sprintf((char *)&packet[108],"#%04X [%04X] %50s", node.nodeReportCode, node.pollReplyCounter, node.reportMsg);
           
           if(node.pollReplyCounter == 9999)
             node.pollReplyCounter = 0;
@@ -379,7 +378,7 @@ uint8_t Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *da
             packet[207+i] = node.ip[i];
 
           //Set the bindIndex, an incremental number depending on universe x of the MAN_NUM_UNIVERSES
-          packet[211] = univ;     //this is an incremental number for the universe.
+          packet[211] = univ+1;     //this is an incremental number for the universe.
           
           //Status 2 field
             // bit0 =1 Product supports web browser configuration.
@@ -391,17 +390,11 @@ uint8_t Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *da
           packet[212] = (node.dchp == 1) ? 0x0E : 0x0C;       //If connected through DCHP the result is 0xE0 otherwise 0x0C bit 2 is the only relevant one.
 
           //Give the above prepaired buffer so I can be send out to the controller.
-          retryCount = 0;
-          while(transferPacket(destinationIP, packet, packetsize) || retryCount < 3) {
-            retryCount++;
-            delay(RETRY_DELAY);
-          }  
+          if(!transferPacket(destinationIP, packet, packetsize))
+            return 1;
       }
-      if(retryCount > 0)
-        return 1;
-      else
-        return 0;
-    }
+      return 0;
+
     // -- OpIpProgReply
     case ART_IPPROG_REPLY:
       return 0;
@@ -417,7 +410,7 @@ uint8_t Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *da
 
 // **** Function Artnet::transderPacket() ****
 // Descr: This function generates the packets and sends to the controller
-// Return: (optional)
+// Return: 1 = success , 0 = fail
 uint8_t Artnet::transferPacket(IPAddress destinationIP, uint8_t *packet, uint16_t size) 
 {
   Udp.beginPacket(destinationIP, ART_NET_PORT);
@@ -481,6 +474,14 @@ IPAddress Artnet::getIP()
   #else
     return WiFi.localIP();
   #endif
+}
+
+// **** Function Artnet::loadDefaults() ****
+// Descr: Enables the user to change the short description of the node.
+// NOTE: Respect the max length of the field. It is only 18 ASCI characters.
+void Artnet::loadDefaults() 
+{
+
 }
 
 // **** Function Artnet::setShortDescr() ****

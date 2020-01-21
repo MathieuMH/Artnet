@@ -273,6 +273,7 @@ class Artnet
     void sendArtPollReply();
     uint16_t maintainDCHP();
     uint8_t  setCmd(uint8_t cmd);
+    void loadDefaults();
     
 };
 
