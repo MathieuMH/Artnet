@@ -523,9 +523,9 @@ IPAddress Artnet::getIP()
 void Artnet::loadDefaults() 
 {
   node.version          = VersionInfoH;
-  node.oem              = 0x0001;
+  node.oem              = ART_OEM_CODE;
   node.style            = ART_ST_NODE;
-  node.etsaman          = 0x7FF0;         //This is an code defined by ETSI for development/experimental usage.
+  node.etsaman          = ETSI_DEV_CODE;         //This is an code defined by ETSI for development/experimental usage.
   node.nodeReportCode   = RC_PWR_OK;
   node.pollReplyCounter = 0;
   node.dchp             = false;

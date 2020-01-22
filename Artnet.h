@@ -63,7 +63,9 @@ const char   defaultLongname[64]  = "Open source Arduino node\0";
 // *** Art-Net packet related paramters
 #define   ART_NET_PORT            0x1936      // Art-Net default port = 0x1936 = 6454 (DO NOT CHANGE!!)
 #define   ART_NET_VERSION         14          // Official Art-Net Version (Current release is 4 with revision number 14)
-#define   MAX_BUFFER_ARTNET       530         // Maximum buffer size.                
+#define   MAX_BUFFER_ARTNET       530         // Maximum buffer size. 
+#define   ETSI_DEV_CODE           0x7FF0      // ETSI Manufacturing code for development purposes.
+#define   ART_OEM_CODE            0x00FF      // Art-Net OEM code for development purposes.              
 
 // Packet
 #define   ART_NET_OP_OFFSET       8
