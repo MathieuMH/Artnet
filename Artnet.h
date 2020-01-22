@@ -51,13 +51,14 @@ THE SOFTWARE.
 #endif
 
 // Art-Net Library information
-const uint8_t  VersionInfoH       = 0x01;
-const char   defaultRprtMsg[50]   = "Art-Net Node\0";
+const uint8_t  VersionInfoH       = 0x02;
+const char   defaultRprtMsg[51]   = "Art-Net Node\0";
 const char   defaultShortname[18] = "Arduino Node\0";
 const char   defaultLongname[64]  = "Open source Arduino node\0";
 //const uint8_t  VersionInfoL       0x01;     //VersionInfoL is not used. The user can use this to set its own version info.
 //#define WIFI_CONNECT_ATTEMTS      20        //Value is the amount of checks to see if there is WL connection.
 #define RETRY_DELAY               500              //Retry delay time
+#define ETH_CHIP_SELLECT          0
 
 // *** Art-Net packet related paramters
 #define   ART_NET_PORT            0x1936      // Art-Net default port = 0x1936 = 6454 (DO NOT CHANGE!!)
@@ -168,7 +169,7 @@ class Artnet
     Artnet();
 
       void begin(byte mac[], byte ip[]);
-      void begin(byte mac[]);
+      uint8_t begin(byte mac[]);
       uint8_t beginWifi(byte mac[]);
       void setBroadcast(byte bc[]);
       void setBroadcast(IPAddress bc);

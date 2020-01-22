@@ -32,69 +32,97 @@ THE SOFTWARE.
 Artnet::Artnet() {}
 
 // **** Function Artnet::begin(mac[], ip[]) ****
-// Descr: This function enables the Ethernet module and opens the UDP port.
+// Descr: This function enables the Ethernet module (without DCHP) and opens the UDP port.
 // Argumenets: mac[] = the mac address to be used. Pointer to array of 6 bytes, ip[] = the static IP address. pointer to array of 4 bytes.
 void Artnet::begin(byte mac[], byte ip[])
 {
+  //First of all, load all default values.
+  loadDefaults();
+
+  //load the specified mac address into the node.mac[] array.
+  memcpy(node.mac, mac, 6);
+
+  //copy the IP address to the node struct.
+  for(int i=0 ; i < 4 ; i++)
+        node.ip[i] = ip[i];
+
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
-    Ethernet.init(0);
+    Ethernet.init(ETH_CHIP_SELLECT);
     Ethernet.begin(mac,ip);
   #endif
   
-  node.dchp = false;
-  //load the specified mac address into the ArtPollReply.mac[] array.
-  memcpy(node.mac, mac, 6);
+  //Now we can listen to the Art-Net port.
   Udp.begin(ART_NET_PORT);
 }
 
 // **** Function Artnet::begin(mac[]) ****
 // Descr: This function enables the Ethernet module and opens the UDP port.
 // Argumenets: mac[] = the mac address to be used. Pointer to array of 6 bytes, ip[] = the static IP address. pointer to array of 4 bytes.
-void Artnet::begin(byte mac[])
+// Return: 1 = DCHP assingment was succes ; 0 = DCHP failed!
+uint8_t Artnet::begin(byte mac[])
 {
+  //First of all, load all default values.
+  loadDefaults();
+
+  //load the specified mac address into the node.mac[] array.
+  memcpy(node.mac, mac, 6);
+
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
-    Ethernet.init(0);
-    Ethernet.begin(mac);
+    Ethernet.init(ETH_CHIP_SELLECT);
+    if(Ethernet.begin(mac)) {
+      //Set DCHP true because we received an IP address.
+      node.dchp = true;
+      
+      //Store the assigned IP address.
+      //IPAddress temp = getIP();
+      for(int i=0 ; i < 4 ; i++)
+        node.ip[i] = getIP()[i];
+
+      //Now we can listen to the Art-Net port.
+      Udp.begin(ART_NET_PORT);
+      return 1;
+    }
   #endif
 
-  node.dchp = true;
-  //load the specified mac address into the ArtPollReply.mac[] array.
-  memcpy(node.mac, mac, 6);
-  Udp.begin(ART_NET_PORT);
-
-  IPAddress temp = getIP();
-      for(int i=0 ; i < 4 ; i++)
-        node.ip[i] = temp[i];
+  return 0;
 }
 
 // **** Function Artnet::beginWifi(mac[]) ****
 // Descr: This function enables the WiFi module and opens the UDP port.
 // Argumenets: mac[] = the mac address to be used. Pointer to array of 6 bytes
 // Return: 0 = connection failed ; 0x01 connection succes
-/* uint8_t Artnet::beginWifi(byte mac[])
+/*uint8_t Artnet::beginWifi(byte mac[], char ssID[], char secKey[])
 {
+  //First of all, load all default values.
+  loadDefaults();
+
+  //load the specified mac address into the node.mac[] array.
+  memcpy(node.mac, mac, 6);
+
   int i = 0;
 
   #if !defined(ARDUINO_SAMD_ZERO) && !defined(ESP8266) && !defined(ESP32)
     Ethernet.begin(mac);
   #endif
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssID, secKey);
 
   if(DEBUG) 
   { 
     Serial.print("WiFi connecting to ");
-    Serial.print(ssid);
+    Serial.print(ssID);
   }
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(RETRY_DELAY);
     
-    if(DEBUG) Serial.print(".");
+    if(DEBUG) 
+      Serial.print(".");
 
     if (i > WIFI_CONNECT_ATTEMTS)
     {
-      if(DEBUG) Serial.print(" FAILED!");  
+      if(DEBUG) 
+        Serial.print(" FAILED!");  
       return 0;
     }
     i++;
@@ -102,14 +130,15 @@ void Artnet::begin(byte mac[])
   Serial.print("SUCCESS! IP: ");
   Serial.println(WiFi.localIP());
 
+  for(int i=0 ; i < 4 ; i++)
+        node.ip[i] = getIP()[i];
+
   //LOCAL IP NOG OPSLAAN!
   node.dchp = true;
 
-  //load the specified mac address into the ArtPollReply.mac[] array.
-  memcpy(ArtPollReply.mac, mac, 6);
   Udp.begin(ART_NET_PORT);
   return 1;
-} */
+}*/
 
 // **** Function Artnet::setBroadcast() ****
 // Descr: With this function the IP can be set, either by IPAddress type or array of bytes.
@@ -128,10 +157,17 @@ void Artnet::setBroadcast(IPAddress bc)
 // Descr: This function parses the received package, checks wether it is valid
 // Return:
 //    In case a supported opcode was received the opcode is returned.
+//    0xFFFF this means that DCHP renew/rebin failed, user should fall back to static IP or wait untill it recovers.
 //    In all other cases 0.
 uint16_t Artnet::read()
 { 
-
+  if(node.dchp)
+    if(maintainDCHP() != 0)
+    {
+      Serial.println("A DCHP rebind/renew failed!");
+      return 0xFFFF;
+    }
+      
   packetSize = Udp.parsePacket();
 
   if(packetSize <= MAX_BUFFER_ARTNET && packetSize > 0)
@@ -280,10 +316,15 @@ void Artnet::printPacketContent()
   Serial.println('\n');
 }
 
-// **** Function Artnet::packet(uint8_t opcode) ****
+// **** Function Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *data, uint16_t datasize) ****
 // Descr: This function generates the packets and sends to the controller
-//    0 = UDP packet was send succesfully
-//    1 = UDP packet was not send out for some reason
+// Arguments: opcode = this defines the packet you want to send.
+//            destinationIP = the location to send the packet to (important for unicast as well as broadcast).
+//            *data = pointer to a data buffer (for future expension, this to enable to send ArtDmx packages)
+//            datasize = defines the size of the to tranfer buffer. (for future expension)
+//    
+// Return:  0 = UDP packet was send succesfully
+//          1 = UDP packet was not send out for some reason
 uint8_t Artnet::sendPacket(uint16_t opcode, IPAddress destinationIP, uint8_t *data, uint16_t datasize)
 {
   uint8_t packetsize = 0;
@@ -453,9 +494,9 @@ uint16_t Artnet::maintainDCHP()
     case 2:
     case 4:
     { 
-      IPAddress temp = getIP();
+      //IPAddress temp = getIP();
       for(int i=0 ; i < 4 ; i++)
-        node.ip[i] = temp[i];
+        node.ip[i] = getIP()[i];
       return 0;
     }
     case 0:
@@ -481,7 +522,25 @@ IPAddress Artnet::getIP()
 // NOTE: Respect the max length of the field. It is only 18 ASCI characters.
 void Artnet::loadDefaults() 
 {
+  node.version          = VersionInfoH;
+  node.oem              = 0x0001;
+  node.style            = ART_ST_NODE;
+  node.etsaman          = 0x7FF0;         //This is an code defined by ETSI for development/experimental usage.
+  node.nodeReportCode   = RC_PWR_OK;
+  node.pollReplyCounter = 0;
+  node.dchp             = false;
 
+  strncpy((char*)node.shortname, defaultShortname, 18);
+  strncpy((char*)node.longname, defaultLongname, 64);
+  strncpy((char*)node.reportMsg, defaultRprtMsg, 51);
+
+  for(int i=0 ; i < ART_NUM_UNIVERSES; i++) 
+  {
+    node.universe[i][0] = i;      //default set universe from 0 to ART_NUM_UNIVERSES
+    node.universe[i][1] = 0;      //Set direction to output (which means art-net receive)
+    node.universe[i][2] = 0;      //Set DMX as output type
+    node.universe[i][3] = 0x80;   //Set goodoutput
+  }
 }
 
 // **** Function Artnet::setShortDescr() ****
