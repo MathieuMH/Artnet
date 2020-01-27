@@ -202,8 +202,8 @@ uint16_t Artnet::read()
           incomingUniverse = artnetPacket[14] | artnetPacket[15] << 8;
           dmxDataLength = artnetPacket[17] | artnetPacket[16] << 8;
 
-          if (artDmxCallback) 
-            (*artDmxCallback)(incomingUniverse, dmxDataLength, sequence, artnetPacket + ART_DMX_START, controllerIP);
+          if (artDmxCallback) (*artDmxCallback)(incomingUniverse, dmxDataLength, sequence, artnetPacket + ART_DMX_START, controllerIP);
+          
           return ART_DMX;
 
         // -- OpPoll received, now we have to respond with an OpPollReply message within 3 seconds.
@@ -218,8 +218,9 @@ uint16_t Artnet::read()
 
         // -- OpSync received, this is the trigger to enable all outputs so they are syncronized. 
         case ART_SYNC:
-          if (artSyncCallback) 
-            (*artSyncCallback)(controllerIP);
+          
+          if (artSyncCallback) (*artSyncCallback)(controllerIP);
+          
           return ART_SYNC;
         
         // -- OpAddress received, now we have to respond with an OpPollReply message within 3 seconds with to confirm the changes.
